@@ -1,13 +1,17 @@
 # server/app.py
 """
-FastAPI server exposing the OpenEnv-compliant API + reliability layer endpoints.
+FastAPI server — v3.0
 
-Core endpoints:      POST /reset, POST /step, GET /state, GET /health
-Evaluation endpoints: GET /trajectory, GET /evaluate, GET /metrics
-Control endpoints:    POST /fault-config
+Core endpoints:        POST /reset, POST /step, GET /state, GET /health
+Evaluation endpoints:  GET /trajectory, GET /evaluate, GET /metrics
+Control endpoints:     POST /fault-config
+Intelligence endpoints: GET /classify, GET /strategy, GET /advanced-metrics,
+                        POST /compare-agents, GET /improvement-plan, GET /viz-data
 """
 from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
+import os
 
 from .environment import CodebaseNavEnvironment
 from .models import (
@@ -15,9 +19,19 @@ from .models import (
     TrajectoryResponse, EvaluationResponse, MetricsResponse,
     FaultConfigRequest,
 )
+from .failure_classifier import FailureClassifier
+from .strategy_detector import StrategyDetector
+from .advanced_metrics import AdvancedMetricsEngine
+from .self_improvement import SelfImprovementEngine
+from .multi_agent import MultiAgentComparison
 
-# Global environment instance (one session per container)
+# Global instances
 env = CodebaseNavEnvironment()
+failure_clf = FailureClassifier()
+strategy_det = StrategyDetector()
+adv_metrics = AdvancedMetricsEngine()
+improvement = SelfImprovementEngine()
+multi_agent = MultiAgentComparison()
 
 
 @asynccontextmanager
@@ -27,45 +41,41 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Codebase Navigation & Repair — OpenEnv",
+    title="Codebase Navigation & Repair — OpenEnv v3",
     description=(
-        "RL environment where agents navigate and repair Python codebases. "
-        "Extended with process-based evaluation, trajectory replay, "
-        "fault injection, security scanning, and memory tracking."
+        "RL environment for AI coding agents — extended with process-based evaluation, "
+        "failure classification, strategy detection, self-improvement loops, "
+        "multi-agent comparison, 3D visualization, and advanced metrics."
     ),
-    version="2.0.0",
+    version="3.0.0",
     lifespan=lifespan,
 )
 
+# Serve static files (3D visualizer HTML)
+_static_dir = os.path.join(os.path.dirname(__file__), "..", "static")
+if os.path.exists(_static_dir):
+    app.mount("/static", StaticFiles(directory=_static_dir), name="static")
 
-# ── Core OpenEnv Endpoints ───────────────────────────────────────────────────
+
+# ── Core OpenEnv Endpoints ────────────────────────────────────────────────────
 
 @app.post("/reset", response_model=ResetResult)
 async def reset(task: str = "task1"):
-    """
-    Start a new episode.
-    task: "task1" | "task2" | "task3"
-    """
     valid_tasks = ["task1", "task2", "task3"]
     if task not in valid_tasks:
         raise HTTPException(status_code=400, detail=f"task must be one of {valid_tasks}")
     try:
-        result = env.reset(task=task)
-        return result
+        return env.reset(task=task)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/step", response_model=StepResult)
 async def step(action: RepoAction):
-    """
-    Take one action in the current episode.
-    """
     if env.done:
-        raise HTTPException(status_code=400, detail="Episode is done. POST /reset to start a new one.")
+        raise HTTPException(status_code=400, detail="Episode is done. POST /reset to start.")
     try:
-        result = env.step(action)
-        return result
+        return env.step(action)
     except RuntimeError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -74,12 +84,8 @@ async def step(action: RepoAction):
 
 @app.get("/state", response_model=StateResult)
 async def state():
-    """
-    Get current state without advancing the episode.
-    """
-    obs = env.get_state()
     return StateResult(
-        observation=obs,
+        observation=env.get_state(),
         current_score=env.final_score,
         total_steps_taken=env.steps_taken,
     )
@@ -87,17 +93,13 @@ async def state():
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "environment": "codebase-nav-env", "version": "2.0.0"}
+    return {"status": "ok", "environment": "codebase-nav-env", "version": "3.0.0"}
 
 
-# ── Evaluation & Reliability Endpoints ───────────────────────────────────────
+# ── Evaluation Endpoints ──────────────────────────────────────────────────────
 
 @app.get("/trajectory", response_model=TrajectoryResponse)
 async def get_trajectory():
-    """
-    Get the full trajectory of the current or most recent episode.
-    Returns every action, observation snapshot, reward, timing, and security flags.
-    """
     traj = env.get_trajectory()
     if not traj:
         return TrajectoryResponse()
@@ -106,11 +108,6 @@ async def get_trajectory():
 
 @app.get("/evaluate", response_model=EvaluationResponse)
 async def get_evaluation():
-    """
-    Get multi-dimensional evaluation of the current/latest episode.
-    Scores across 6 dimensions: efficiency, navigation, correctness,
-    reasoning, robustness, security.
-    """
     evaluation = env.get_evaluation()
     if "error" in evaluation:
         return EvaluationResponse()
@@ -119,23 +116,224 @@ async def get_evaluation():
 
 @app.get("/metrics", response_model=MetricsResponse)
 async def get_metrics():
-    """
-    Get comprehensive metrics including memory usage, security stats,
-    fault injection report, wasteful patterns, and action timeline.
-    """
-    metrics = env.get_metrics()
-    return MetricsResponse(**metrics)
+    return MetricsResponse(**env.get_metrics())
 
 
 @app.post("/fault-config")
 async def set_fault_config(config: FaultConfigRequest):
-    """
-    Configure fault injection for the NEXT episode (takes effect on next /reset).
-    Levels: "none" (default), "light" (misleading comments), "heavy" (all faults)
-    """
     env.set_fault_config(config.level)
     return {
         "status": "ok",
         "fault_level": config.level,
         "message": f"Fault injection set to '{config.level}'. Takes effect on next /reset.",
+    }
+
+
+# ── Intelligence Endpoints (NEW in v3) ────────────────────────────────────────
+
+@app.get("/classify")
+async def classify_failure():
+    """
+    Classify the failure type of the current/latest episode.
+    Returns typed failure taxonomy with root cause and remediation.
+    """
+    traj = env.get_trajectory()
+    if not traj:
+        return {"error": "No trajectory available. Run an episode first."}
+
+    steps = traj.get("steps", [])
+    meta = env.variant.meta if env.variant else {}
+
+    report = failure_clf.classify(
+        episode_id=traj.get("episode_id", ""),
+        task=env.current_task or "unknown",
+        trajectory_steps=steps,
+        variant_meta=meta,
+        files_read=list(env.files_read),
+        files_written=list(env.files_written),
+        final_score=env.final_score,
+        security_violations=env.security_violations,
+    )
+    return report.to_dict()
+
+
+@app.get("/strategy")
+async def detect_strategy():
+    """
+    Detect the behavioral strategy pattern used by the agent.
+    Returns: TARGETED_DEBUGGING | SYSTEMATIC_SEARCH | BRUTE_FORCE |
+             RANDOM_EXPLORATION | SPEC_DRIVEN | MINIMAL_EFFORT
+    """
+    traj = env.get_trajectory()
+    if not traj:
+        return {"error": "No trajectory available."}
+
+    steps = traj.get("steps", [])
+    meta = env.variant.meta if env.variant else {}
+
+    report = strategy_det.detect(
+        trajectory_steps=steps,
+        task=env.current_task or "unknown",
+        variant_meta=meta,
+        files_read=list(env.files_read),
+        final_score=env.final_score,
+    )
+    return report.to_dict()
+
+
+@app.get("/advanced-metrics")
+async def get_advanced_metrics():
+    """
+    Compute advanced metrics: reasoning efficiency, decision entropy,
+    exploration ratio, reliability index, consistency, pivot rate.
+    """
+    traj = env.get_trajectory()
+    if not traj:
+        return {"error": "No trajectory available."}
+
+    steps = traj.get("steps", [])
+    meta = env.variant.meta if env.variant else {}
+
+    report = adv_metrics.compute(
+        trajectory_steps=steps,
+        variant_meta=meta,
+        final_score=env.final_score,
+        files_read=list(env.files_read),
+        files_written=list(env.files_written),
+    )
+    return report.to_dict()
+
+
+@app.get("/improvement-plan")
+async def get_improvement_plan():
+    """
+    Generate a self-improvement plan based on failure classification.
+    Returns: what_went_wrong, improved_strategy, step-by-step plan,
+             system_prompt_addon (for injecting into next agent run).
+    """
+    traj = env.get_trajectory()
+    if not traj:
+        return {"error": "No trajectory available."}
+
+    steps = traj.get("steps", [])
+    meta = env.variant.meta if env.variant else {}
+
+    # Classify first
+    fail_report = failure_clf.classify(
+        episode_id=traj.get("episode_id", ""),
+        task=env.current_task or "unknown",
+        trajectory_steps=steps,
+        variant_meta=meta,
+        files_read=list(env.files_read),
+        files_written=list(env.files_written),
+        final_score=env.final_score,
+        security_violations=env.security_violations,
+    )
+
+    plan = improvement.generate_improvement_plan(
+        episode_id=traj.get("episode_id", ""),
+        task=env.current_task or "unknown",
+        failure_type=fail_report.primary_failure,
+        failure_evidence=[f.evidence for f in fail_report.failures],
+        original_score=env.final_score,
+        trajectory_steps=steps,
+        files_read=list(env.files_read),
+        files_written=list(env.files_written),
+    )
+    return plan.to_dict()
+
+
+@app.post("/compare-agents")
+async def compare_agents(task: str = "task1", agents: str = "all"):
+    """
+    Run multiple agent strategies on the same task and compare side-by-side.
+    agents: "all" | comma-separated list of: test-first,search-first,minimal,exhaustive
+    """
+    valid_tasks = ["task1", "task2", "task3"]
+    if task not in valid_tasks:
+        raise HTTPException(status_code=400, detail=f"task must be one of {valid_tasks}")
+
+    if agents == "all":
+        agent_list = None
+    else:
+        agent_list = [a.strip() for a in agents.split(",")]
+
+    try:
+        report = multi_agent.compare(env, task=task, agents=agent_list)
+        return report.to_dict()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/viz-data")
+async def get_viz_data():
+    """
+    Get structured 3D visualization data for the current/latest episode.
+    Returns nodes (files), edges (dependencies), and step trajectory
+    in the format expected by the Three.js visualizer.
+    """
+    traj = env.get_trajectory()
+    if not traj:
+        return {"error": "No trajectory available."}
+
+    # Build file nodes
+    files = []
+    visited = set(env.files_read)
+    modified = set(env.files_written)
+    meta = env.variant.meta if env.variant else {}
+    bug_files = set(meta.get("bug_files", []))
+
+    if env.variant:
+        tree = env.variant.get_tree()
+        for f in tree:
+            ftype = "test" if f.startswith("tests/") else \
+                    "spec" if f.endswith(".md") else "src"
+            files.append({
+                "name": f,
+                "type": ftype,
+                "is_bug_file": f in bug_files,
+                "visited": f in visited,
+                "modified": f in modified,
+            })
+
+    # Build dependency edges from known patterns
+    deps = []
+    test_files = [f["name"] for f in files if f["type"] == "test"]
+    src_files = [f["name"] for f in files if f["type"] == "src"]
+
+    # Simple heuristic: connect tests to src files
+    for tf in test_files:
+        for sf in src_files:
+            deps.append({"from": tf, "to": sf})
+
+    # Build step data for trajectory
+    steps_data = []
+    for step in traj.get("steps", []):
+        steps_data.append({
+            "step": step.get("step_number", 0),
+            "action": step.get("action_type", ""),
+            "path": step.get("action_path"),
+            "reward": step.get("reward", 0.0),
+            "error": step.get("error"),
+            "pass_rate": step.get("test_pass_rate"),
+        })
+
+    # Get strategy
+    strategy_info = strategy_det.detect(
+        traj.get("steps", []),
+        env.current_task or "unknown",
+        meta,
+        list(env.files_read),
+        env.final_score,
+    ) if traj.get("steps") else None
+
+    return {
+        "task": env.current_task or "unknown",
+        "variant_id": traj.get("variant_id", "unknown"),
+        "final_score": env.final_score,
+        "strategy": strategy_info.strategy if strategy_info else "UNKNOWN",
+        "failure_type": "—",
+        "files": files,
+        "dependencies": deps,
+        "steps": steps_data,
     }

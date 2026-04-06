@@ -1,80 +1,92 @@
 #!/usr/bin/env python3
 """
-app.py — Gradio UI + FastAPI endpoints for the OpenEnv environment.
-This is the HF Space entry point.
+app.py — Gradio UI v3.0 — Full Platform Entry Point
+
+Tabs:
+  🎮 Interactive          — manual step-by-step control
+  🤖 Run Agent            — built-in deterministic agent demo
+  📊 Evaluation           — 6-dimension evaluation report
+  🧠 Intelligence         — failure classification, strategy, advanced metrics
+  🔁 Self-Improve         — improvement plan after failure
+  ⚖️ Compare Agents       — side-by-side multi-agent comparison
+  🌐 3D Visualizer        — Three.js trajectory visualization
+  📖 API                  — REST API reference
 """
 import os
 import json
 import gradio as gr
 from server.environment import CodebaseNavEnvironment
 from server.models import RepoAction
+from server.failure_classifier import FailureClassifier
+from server.strategy_detector import StrategyDetector
+from server.advanced_metrics import AdvancedMetricsEngine
+from server.self_improvement import SelfImprovementEngine
+from server.multi_agent import MultiAgentComparison
 
-# ── Global environment instance ──────────────────────────────────────────────
+# ── Global instances ──────────────────────────────────────────────────────────
 env = CodebaseNavEnvironment()
+failure_clf = FailureClassifier()
+strategy_det = StrategyDetector()
+adv_metrics_engine = AdvancedMetricsEngine()
+improvement_engine = SelfImprovementEngine()
+multi_agent_engine = MultiAgentComparison()
 
 
-# ── Gradio callback functions ────────────────────────────────────────────────
+# ── Tab 1: Interactive ────────────────────────────────────────────────────────
 
 def reset_environment(task: str):
-    """Reset environment and return initial state."""
     try:
         result = env.reset(task=task)
         obs = result.observation
         tree = "\n".join(f"  📄 {f}" for f in obs.repo_tree)
         failing = ", ".join(obs.failing_tests) if obs.failing_tests else "None listed"
-        info_data = result.info
+        fi = result.info.get("fault_injection", {})
+        faults = ""
+        if fi.get("faults_injected"):
+            faults = f"\n\n⚠️ Fault Injection ({fi.get('difficulty_multiplier', 1.0):.1f}x):\n"
+            faults += "\n".join(f"  • {f}" for f in fi["faults_injected"][:5])
 
-        status_text = (
-            f"✅ Episode started\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"Task: {task}\n"
-            f"Variant: {info_data.get('variant_id', 'unknown')}\n"
-            f"Steps remaining: {obs.steps_remaining}\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            f"📁 Repository Files:\n{tree}\n\n"
+        status = (
+            f"✅ Episode Started — {task} (variant: {result.info.get('variant_id', '?')})\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"Steps: {obs.steps_remaining} remaining\n\n"
+            f"📁 Files:\n{tree}\n\n"
             f"🔴 Failing Tests: {failing}\n\n"
-            f"📋 Task: {obs.task_description}"
+            f"📋 Task: {obs.task_description}{faults}"
         )
-        return status_text, "", "0", "0.000"
+        return status, "", "0", "0.000"
     except Exception as e:
         return f"❌ Error: {e}", "", "0", "0.000"
 
 
 def take_step(action_type: str, path: str, query: str, content: str):
-    """Execute one agent step."""
     if env.done:
-        return "❌ Episode is done. Reset first.", "", "", ""
-
+        return "❌ Episode done. Reset first.", "", "", ""
     try:
         action = RepoAction(
             action_type=action_type,
-            path=path if path.strip() else None,
-            query=query if query.strip() else None,
-            content=content if content.strip() else None,
+            path=path.strip() or None,
+            query=query.strip() or None,
+            content=content.strip() or None,
         )
         result = env.step(action)
         obs = result.observation
-
-        action_result = obs.last_action_result or "No output"
-        error = obs.last_action_error or ""
-        if error:
-            error = f"⚠️ {error}"
+        result_text = obs.last_action_result or "No output"
+        error = f"\n⚠️ {obs.last_action_error}" if obs.last_action_error else ""
+        flags = result.info.get("security_flags", [])
+        sec = f"\n🔒 Security: {flags}" if flags else ""
 
         status = (
             f"Step {result.info['steps_taken']} | "
             f"Reward: {result.reward:+.3f} | "
-            f"Steps left: {obs.steps_remaining}"
+            f"Steps left: {obs.steps_remaining}{error}{sec}"
         )
         if result.done:
-            status += f"\n\n🏁 EPISODE DONE — Final Score: {result.info['final_score']:.3f}"
-
-        flags = result.info.get("security_flags", [])
-        if flags:
-            status += f"\n🔒 Security: {flags}"
+            status += f"\n\n🏁 DONE — Score: {result.info['final_score']:.3f}"
 
         return (
             status,
-            action_result[:3000],
+            result_text[:3000],
             str(result.info["steps_taken"]),
             f"{result.info.get('cumulative_reward', 0):.3f}",
         )
@@ -82,261 +94,567 @@ def take_step(action_type: str, path: str, query: str, content: str):
         return f"❌ Error: {e}", "", "", ""
 
 
+# ── Tab 2: Run Agent ──────────────────────────────────────────────────────────
+
+def run_builtin_agent(task: str):
+    try:
+        result = env.reset(task=task)
+        obs = result.observation
+        log = [
+            f"🚀 {task} (variant: {result.info.get('variant_id')})",
+            f"   Files: {obs.repo_tree}",
+            f"   Failing: {obs.failing_tests}",
+        ]
+        tree = obs.repo_tree
+        test_files = sorted([f for f in tree if f.startswith("tests/")])
+        src_files = sorted([f for f in tree if f.startswith("src/") and f.endswith(".py")])
+        spec_files = sorted([f for f in tree if f.endswith(".md")])
+        steps = 0
+
+        if task == "task3" and spec_files:
+            for sf in spec_files:
+                if env.done: break
+                r = env.step(RepoAction(action_type="read_file", path=sf))
+                steps += 1
+                log.append(f"   Step {steps}: read_file {sf} → {r.reward:+.3f}")
+
+        for tf in test_files:
+            if env.done: break
+            r = env.step(RepoAction(action_type="read_file", path=tf))
+            steps += 1
+            log.append(f"   Step {steps}: read_file {tf} → {r.reward:+.3f}")
+
+        for sf in src_files:
+            if env.done or steps >= 12: break
+            r = env.step(RepoAction(action_type="read_file", path=sf))
+            steps += 1
+            log.append(f"   Step {steps}: read_file {sf} → {r.reward:+.3f}")
+
+        if not env.done and test_files:
+            r = env.step(RepoAction(action_type="run_tests", path=test_files[0]))
+            steps += 1
+            log.append(f"   Step {steps}: run_tests → {r.reward:+.3f}")
+
+        if not env.done:
+            r = env.step(RepoAction(action_type="submit"))
+            steps += 1
+            log.append(f"   Step {steps}: submit → {r.reward:+.3f}")
+
+        log += [
+            f"\n🏁 Score: {env.final_score:.3f}",
+            f"   Steps: {steps}",
+            f"   Reward: {env.cumulative_reward:.3f}",
+        ]
+        return "\n".join(log)
+    except Exception as e:
+        return f"❌ Error: {e}"
+
+
+# ── Tab 3: Evaluation ─────────────────────────────────────────────────────────
+
 def get_evaluation():
-    """Get multi-dimensional evaluation report."""
     try:
         ev = env.get_evaluation()
         if "error" in ev:
             return "No evaluation available. Run an episode first."
-
         lines = [
             f"🎯 Composite Score: {ev['composite_score']:.3f}",
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
         ]
         for name, dim in ev.get("dimensions", {}).items():
             bar = "█" * int(dim["score"] * 20) + "░" * (20 - int(dim["score"] * 20))
             lines.append(f"  {name:15s} [{bar}] {dim['score']:.3f}")
-            for e in dim.get("evidence", []):
+            for e in dim.get("evidence", [])[:2]:
                 lines.append(f"    → {e}")
-
         if ev.get("strengths"):
-            lines.append("\n💪 Strengths:")
-            for s in ev["strengths"]:
-                lines.append(f"  ✅ {s}")
-
+            lines += ["\n💪 Strengths:"] + [f"  ✅ {s}" for s in ev["strengths"]]
         if ev.get("failure_analysis"):
-            lines.append("\n⚠️ Failures:")
-            for f in ev["failure_analysis"]:
-                lines.append(f"  ❌ {f}")
-
+            lines += ["\n⚠️ Failures:"] + [f"  ❌ {f}" for f in ev["failure_analysis"]]
         if ev.get("recommendations"):
-            lines.append("\n💡 Recommendations:")
-            for r in ev["recommendations"]:
-                lines.append(f"  → {r}")
-
+            lines += ["\n💡 Recommendations:"] + [f"  → {r}" for r in ev["recommendations"]]
         return "\n".join(lines)
     except Exception as e:
         return f"Error: {e}"
 
 
 def get_metrics():
-    """Get comprehensive metrics."""
     try:
-        m = env.get_metrics()
-        return json.dumps(m, indent=2, default=str)
+        return json.dumps(env.get_metrics(), indent=2, default=str)
     except Exception as e:
         return f"Error: {e}"
 
 
 def get_trajectory():
-    """Get full trajectory."""
     try:
         t = env.get_trajectory()
         if not t:
-            return "No trajectory available."
-
+            return "No trajectory. Run an episode first."
         lines = [
-            f"Episode: {t.get('episode_id', 'N/A')}",
-            f"Task: {t.get('task', 'N/A')} | Variant: {t.get('variant_id', 'N/A')}",
-            f"Duration: {t.get('duration_seconds', 'N/A')}s | Score: {t.get('final_score', 0):.3f}",
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            f"Episode: {t.get('episode_id')}",
+            f"Task: {t.get('task')} | Variant: {t.get('variant_id')}",
+            f"Score: {t.get('final_score', 0):.3f} | Duration: {t.get('duration_seconds', '?')}s",
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
         ]
+        emojis = {"read_file": "📖", "write_file": "✏️", "run_tests": "🧪",
+                  "search_code": "🔍", "submit": "🏁"}
         for step in t.get("steps", []):
-            emoji = "📖" if step["action_type"] == "read_file" else \
-                    "✏️" if step["action_type"] == "write_file" else \
-                    "🧪" if step["action_type"] == "run_tests" else \
-                    "🔍" if step["action_type"] == "search_code" else "🏁"
-            path = step.get("action_path") or step.get("action_query") or ""
-            err = f" ❌ {step['error']}" if step.get("error") else ""
+            em = emojis.get(step["action_type"], "•")
+            p = step.get("action_path") or step.get("action_query") or ""
+            err = " ❌" if step.get("error") else ""
             lines.append(
-                f"  {emoji} Step {step['step_number']:2d}: "
-                f"{step['action_type']:12s} {path:30s} "
-                f"reward={step['reward']:+.3f} "
-                f"({step['duration_ms']:.0f}ms){err}"
+                f"  {em} {step['step_number']:2d}: {step['action_type']:12s} {p:30s} "
+                f"reward={step['reward']:+.3f} ({step['duration_ms']:.0f}ms){err}"
             )
         return "\n".join(lines)
     except Exception as e:
         return f"Error: {e}"
 
 
-def run_builtin_agent(task: str):
-    """Run the built-in deterministic agent for a quick demo."""
+# ── Tab 4: Intelligence ───────────────────────────────────────────────────────
+
+def get_failure_classification():
     try:
-        # Reset
-        result = env.reset(task=task)
-        obs = result.observation
-        log_lines = [f"🚀 Starting {task} (variant: {result.info.get('variant_id')})"]
-        log_lines.append(f"   Files: {obs.repo_tree}")
-        log_lines.append(f"   Failing: {obs.failing_tests}")
+        traj = env.get_trajectory()
+        if not traj:
+            return "No trajectory. Run an episode first."
+        meta = env.variant.meta if env.variant else {}
+        report = failure_clf.classify(
+            episode_id=traj.get("episode_id", ""),
+            task=env.current_task or "unknown",
+            trajectory_steps=traj.get("steps", []),
+            variant_meta=meta,
+            files_read=list(env.files_read),
+            files_written=list(env.files_written),
+            final_score=env.final_score,
+            security_violations=env.security_violations,
+        )
+        d = report.to_dict()
+        lines = [
+            f"{'✅ SUCCESS' if d['success'] else '❌ FAILURE'}",
+            f"Primary Failure Type: {d['primary_failure']}",
+            f"Failures Detected: {d['failure_count']}",
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        ]
+        for f in d.get("failures", []):
+            lines += [
+                f"\n[{f['severity'].upper()}] {f['type']} @ Step {f['step']}",
+                f"  Evidence: {f['evidence']}",
+                f"  Root Cause: {f['root_cause']}",
+                f"  Fix: {f['remediation']}",
+            ]
+        if d.get("failure_summary"):
+            lines += ["\n📋 Summary:", f"  {d['failure_summary']}"]
+        if d.get("retry_hint"):
+            lines += ["\n🔁 Retry Hint:", f"  {d['retry_hint']}"]
+        return "\n".join(lines)
+    except Exception as e:
+        return f"Error: {e}"
 
-        # Strategy: read test file → read source → fix → run tests → submit
-        test_files = [f for f in obs.repo_tree if f.startswith("tests/")]
-        src_files = [f for f in obs.repo_tree if f.startswith("src/") and f.endswith(".py")]
-        spec_files = [f for f in obs.repo_tree if f.endswith(".md")]
 
-        steps_done = 0
-        max_demo_steps = 15
+def get_strategy_detection():
+    try:
+        traj = env.get_trajectory()
+        if not traj:
+            return "No trajectory. Run an episode first."
+        meta = env.variant.meta if env.variant else {}
+        report = strategy_det.detect(
+            trajectory_steps=traj.get("steps", []),
+            task=env.current_task or "unknown",
+            variant_meta=meta,
+            files_read=list(env.files_read),
+            final_score=env.final_score,
+        )
+        d = report.to_dict()
+        score_bar = "█" * int(d["score"] * 20) + "░" * (20 - int(d["score"] * 20))
+        lines = [
+            f"🧭 Strategy: {d['strategy']}",
+            f"   Score:  [{score_bar}] {d['score']:.3f}",
+            f"   Confidence: {d['confidence']:.0%}",
+            f"\n📖 {d['strategy_description']}",
+            f"\n📊 Exploration Ratio: {d['exploration_ratio']:.2f} "
+            f"({'explore-heavy' if d['exploration_ratio'] > 0.6 else 'exploit-heavy' if d['exploration_ratio'] < 0.4 else 'balanced'})",
+            f"   Strategy Pivots: {d['pivot_count']}",
+        ]
+        if d.get("sub_patterns"):
+            lines += ["\n🔖 Sub-patterns:"] + [f"  • {p}" for p in d["sub_patterns"]]
+        if d.get("evidence"):
+            lines += ["\n🔍 Evidence:"] + [f"  → {e}" for e in d["evidence"]]
+        return "\n".join(lines)
+    except Exception as e:
+        return f"Error: {e}"
 
-        # Step 1: read spec or test
-        if task == "task3" and spec_files:
-            target = spec_files[0]
-        elif test_files:
-            target = test_files[0]
-        else:
-            target = obs.repo_tree[0]
 
-        step_result = env.step(RepoAction(action_type="read_file", path=target))
-        steps_done += 1
-        log_lines.append(f"   Step {steps_done}: read_file {target} → reward={step_result.reward:+.3f}")
+def get_advanced_metrics():
+    try:
+        traj = env.get_trajectory()
+        if not traj:
+            return "No trajectory. Run an episode first."
+        meta = env.variant.meta if env.variant else {}
+        report = adv_metrics_engine.compute(
+            trajectory_steps=traj.get("steps", []),
+            variant_meta=meta,
+            final_score=env.final_score,
+            files_read=list(env.files_read),
+            files_written=list(env.files_written),
+        )
+        d = report.to_dict()
 
-        # Step 2+: read all source files
-        for sf in src_files:
-            if env.done or steps_done >= max_demo_steps - 2:
-                break
-            step_result = env.step(RepoAction(action_type="read_file", path=sf))
-            steps_done += 1
-            log_lines.append(f"   Step {steps_done}: read_file {sf} → reward={step_result.reward:+.3f}")
+        def bar(v):
+            return "█" * int(v * 20) + "░" * (20 - int(v * 20))
 
-        # Step N-1: run tests
-        if not env.done and steps_done < max_demo_steps - 1:
-            step_result = env.step(RepoAction(action_type="run_tests"))
-            steps_done += 1
-            log_lines.append(f"   Step {steps_done}: run_tests → reward={step_result.reward:+.3f}")
+        lines = [
+            "⚡ ADVANCED METRICS",
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            f"  Reasoning Efficiency  [{bar(d['reasoning_efficiency'])}] {d['reasoning_efficiency']:.3f}",
+            f"  Reliability Index     [{bar(d['reliability_index'])}] {d['reliability_index']:.3f}",
+            f"  Exploration Ratio     [{bar(d['exploration_ratio'])}] {d['exploration_ratio']:.3f}",
+            f"  Decision Entropy      [{bar(d['decision_entropy'])}] {d['decision_entropy']:.3f}",
+            f"  Wasteful Ratio        [{bar(d['wasteful_ratio'])}] {d['wasteful_ratio']:.3f}",
+            f"  Pivot Rate            {d['pivot_rate']:.2f} per 10 steps",
+            f"  Consistency           [{bar(d['consistency_score'])}] {d['consistency_score']:.3f} ({d['runs_analyzed']} runs)",
+            "\n📊 Action Distribution:",
+        ]
+        for action, count in d.get("action_distribution", {}).items():
+            lines.append(f"  {action:15s}: {count}")
+        if d.get("useful_actions"):
+            lines += ["\n✅ Useful Actions:"] + [f"  • {a}" for a in d["useful_actions"]]
+        if d.get("wasteful_actions"):
+            lines += ["\n⚠️ Wasteful Actions:"] + [f"  • {a}" for a in d["wasteful_actions"]]
+        lines += ["\n🔒 Reliability Breakdown:"]
+        for k, v in d.get("reliability_breakdown", {}).items():
+            lines.append(f"  {k:15s}: {v:.3f}")
+        return "\n".join(lines)
+    except Exception as e:
+        return f"Error: {e}"
 
-        # Step N: submit
-        if not env.done:
-            step_result = env.step(RepoAction(action_type="submit"))
-            steps_done += 1
-            log_lines.append(f"   Step {steps_done}: submit → reward={step_result.reward:+.3f}")
 
-        log_lines.append(f"\n🏁 Final Score: {env.final_score:.3f}")
-        log_lines.append(f"   Total Steps: {steps_done}")
-        log_lines.append(f"   Cumulative Reward: {env.cumulative_reward:.3f}")
+# ── Tab 5: Self-Improve ───────────────────────────────────────────────────────
 
-        return "\n".join(log_lines)
+def get_improvement_plan():
+    try:
+        traj = env.get_trajectory()
+        if not traj:
+            return "No trajectory. Run an episode first."
+        meta = env.variant.meta if env.variant else {}
+        steps = traj.get("steps", [])
+
+        fail_report = failure_clf.classify(
+            episode_id=traj.get("episode_id", ""),
+            task=env.current_task or "unknown",
+            trajectory_steps=steps,
+            variant_meta=meta,
+            files_read=list(env.files_read),
+            files_written=list(env.files_written),
+            final_score=env.final_score,
+            security_violations=env.security_violations,
+        )
+        plan = improvement_engine.generate_improvement_plan(
+            episode_id=traj.get("episode_id", ""),
+            task=env.current_task or "unknown",
+            failure_type=fail_report.primary_failure,
+            failure_evidence=[f.evidence for f in fail_report.failures],
+            original_score=env.final_score,
+            trajectory_steps=steps,
+            files_read=list(env.files_read),
+            files_written=list(env.files_written),
+        )
+        d = plan.to_dict()
+        lines = [
+            f"🔁 SELF-IMPROVEMENT PLAN",
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            f"Original Score: {d['original_score']:.3f}",
+            f"Failure Type: {d['failure_type']}",
+            f"\n❌ What Went Wrong:\n  {d['what_went_wrong']}",
+            f"\n🎯 Improved Strategy:\n  {d['improved_strategy']}",
+            f"\n📋 Step-by-Step Plan:",
+        ]
+        for step in d.get("step_by_step_plan", []):
+            lines.append(f"  {step}")
+        if d.get("specific_errors"):
+            lines += ["\n🔎 Specific Errors:"] + [f"  • {e}" for e in d["specific_errors"][:5]]
+        lines += [
+            "\n💉 System Prompt Injection (for next LLM run):",
+            "─────────────────────────────────────",
+            d.get("system_prompt_addon", "No injection needed."),
+        ]
+        return "\n".join(lines)
+    except Exception as e:
+        return f"Error: {e}"
+
+
+# ── Tab 6: Compare Agents ─────────────────────────────────────────────────────
+
+def run_comparison(task: str, selected_agents: list):
+    try:
+        agents = selected_agents if selected_agents else None
+        report = multi_agent_engine.compare(env, task=task, agents=agents)
+        d = report.to_dict()
+
+        lines = [
+            f"⚖️ MULTI-AGENT COMPARISON — {task} (variant: {d.get('variant_id')})",
+            f"🏆 Winner: {d.get('winner')} (score: {d.get('winner_score', 0):.3f})",
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            f"{'Rank':<6} {'Agent':<16} {'Score':<8} {'Steps':<8} {'Strategy':<22} {'Failure':<22} {'Reliability':<12}",
+            "─" * 100,
+        ]
+        for row in d.get("summary_table", []):
+            lines.append(
+                f"#{row['rank']:<5} {row['agent']:<16} {row['score']:<8.3f} "
+                f"{row['steps']:<8} {row['strategy']:<22} {row['failure']:<22} {row['reliability']:<12.3f}"
+            )
+        lines.append("━" * 100)
+
+        if d.get("insights"):
+            lines += ["\n💡 Insights:"] + [f"  → {i}" for i in d["insights"]]
+
+        lines.append("\n📊 Per-Agent Action Sequences:")
+        for run in d.get("detailed_runs", []):
+            seq = " → ".join(run.get("action_sequence", []))
+            lines.append(f"  {run['agent_name']:16s}: {seq}")
+
+        return "\n".join(lines)
     except Exception as e:
         return f"❌ Error: {e}"
 
 
-# ── Build the Gradio UI ─────────────────────────────────────────────────────
+# ── Tab 7: 3D Visualizer ──────────────────────────────────────────────────────
 
-with gr.Blocks(
-    title="Codebase Navigation & Repair — OpenEnv",
-) as demo:
+def get_viz_html():
+    """Generate the 3D visualizer HTML with current trajectory data injected."""
+    # Load the static HTML template
+    static_path = os.path.join(os.path.dirname(__file__), "static", "viz3d.html")
+    if not os.path.exists(static_path):
+        return "<p style='color:red'>viz3d.html not found in static/</p>"
+
+    with open(static_path, "r") as f:
+        html = f.read()
+
+    # Get viz data from current environment
+    traj = env.get_trajectory()
+    if traj:
+        meta = env.variant.meta if env.variant else {}
+        bug_files = set(meta.get("bug_files", []))
+        files = []
+        if env.variant:
+            for fname in env.variant.get_tree():
+                ftype = "test" if fname.startswith("tests/") else \
+                        "spec" if fname.endswith(".md") else "src"
+                files.append({
+                    "name": fname,
+                    "type": ftype,
+                    "is_bug_file": fname in bug_files,
+                    "visited": fname in env.files_read,
+                    "modified": fname in env.files_written,
+                })
+
+        test_files = [f["name"] for f in files if f["type"] == "test"]
+        src_files = [f["name"] for f in files if f["type"] == "src"]
+        deps = []
+        for tf in test_files:
+            for sf in src_files:
+                deps.append({"from": tf, "to": sf})
+
+        steps_data = []
+        for step in traj.get("steps", []):
+            steps_data.append({
+                "step": step.get("step_number", 0),
+                "action": step.get("action_type", ""),
+                "path": step.get("action_path"),
+                "reward": step.get("reward", 0.0),
+                "error": step.get("error"),
+                "pass_rate": step.get("test_pass_rate"),
+            })
+
+        strategy_report = strategy_det.detect(
+            traj.get("steps", []),
+            env.current_task or "unknown",
+            meta,
+            list(env.files_read),
+            env.final_score,
+        ) if traj.get("steps") else None
+
+        viz_data = {
+            "task": env.current_task or "unknown",
+            "variant_id": traj.get("variant_id", "unknown"),
+            "final_score": env.final_score,
+            "strategy": strategy_report.strategy if strategy_report else "UNKNOWN",
+            "failure_type": "—",
+            "files": files,
+            "dependencies": deps,
+            "steps": steps_data,
+        }
+        data_json = json.dumps(viz_data)
+    else:
+        data_json = ""
+
+    # Inject data into HTML
+    html = html.replace(
+        '<div id="viz-data" style="display:none"></div>',
+        f'<div id="viz-data" style="display:none">{data_json}</div>'
+    )
+    return html
+
+
+# ── Build Gradio UI ───────────────────────────────────────────────────────────
+
+with gr.Blocks(title="Codebase Navigation & Repair — OpenEnv v3") as demo:
     gr.Markdown(
-        "# 🔍 Codebase Navigation & Repair — OpenEnv\n"
-        "**RL environment for testing AI coding agents.** "
-        "Agents navigate repos, find bugs, and fix them — graded by actual pytest execution."
+        "# 🔍 Codebase Navigation & Repair — OpenEnv v3\n"
+        "**The most advanced debugging + evaluation platform for AI coding agents.** "
+        "Navigate codebases · Fix bugs · Evaluate process · Visualize in 3D."
     )
 
     with gr.Tabs():
-        # ── Tab 1: Interactive Environment ────────────────────────────────
+
+        # ── Tab 1: Interactive ────────────────────────────────────────────────
         with gr.TabItem("🎮 Interactive"):
             with gr.Row():
                 with gr.Column(scale=1):
                     task_select = gr.Dropdown(
-                        choices=["task1", "task2", "task3"],
-                        value="task1",
+                        ["task1", "task2", "task3"], value="task1",
                         label="Task",
-                        info="task1=single-file bugs, task2=cross-module, task3=feature impl"
+                        info="task1=bugs, task2=cross-module, task3=feature impl"
                     )
                     reset_btn = gr.Button("🔄 Reset Environment", variant="primary")
-
-                    gr.Markdown("### Take an Action")
-                    action_type = gr.Dropdown(
-                        choices=["read_file", "write_file", "run_tests", "search_code", "submit"],
-                        value="read_file",
-                        label="Action Type",
+                    gr.Markdown("### Action")
+                    act_type = gr.Dropdown(
+                        ["read_file", "write_file", "run_tests", "search_code", "submit"],
+                        value="read_file", label="Action Type",
                     )
-                    action_path = gr.Textbox(label="Path (for read/write/run_tests)", placeholder="src/auth.py")
-                    action_query = gr.Textbox(label="Query (for search_code)", placeholder="validate_token")
-                    action_content = gr.Textbox(label="Content (for write_file)", lines=5, placeholder="# new file content...")
+                    act_path = gr.Textbox(label="Path", placeholder="src/auth.py")
+                    act_query = gr.Textbox(label="Query (search_code)", placeholder="validate_token")
+                    act_content = gr.Textbox(label="Content (write_file)", lines=4)
                     step_btn = gr.Button("▶️ Execute Step", variant="secondary")
-
                 with gr.Column(scale=2):
-                    status_box = gr.Textbox(label="Status", lines=15, interactive=False)
-                    result_box = gr.Textbox(label="Last Action Result", lines=10, interactive=False)
+                    status_box = gr.Textbox(label="Status", lines=14, interactive=False)
+                    result_box = gr.Textbox(label="Last Result", lines=8, interactive=False)
                     with gr.Row():
-                        steps_box = gr.Textbox(label="Steps Taken", value="0", interactive=False)
+                        steps_box = gr.Textbox(label="Steps", value="0", interactive=False)
                         reward_box = gr.Textbox(label="Cumulative Reward", value="0.000", interactive=False)
+            reset_btn.click(reset_environment, [task_select], [status_box, result_box, steps_box, reward_box])
+            step_btn.click(take_step, [act_type, act_path, act_query, act_content], [status_box, result_box, steps_box, reward_box])
 
-            reset_btn.click(
-                reset_environment, inputs=[task_select],
-                outputs=[status_box, result_box, steps_box, reward_box],
-            )
-            step_btn.click(
-                take_step,
-                inputs=[action_type, action_path, action_query, action_content],
-                outputs=[status_box, result_box, steps_box, reward_box],
-            )
-
-        # ── Tab 2: Run Agent ─────────────────────────────────────────────
+        # ── Tab 2: Run Agent ──────────────────────────────────────────────────
         with gr.TabItem("🤖 Run Agent"):
-            gr.Markdown(
-                "### Built-in Demonstration Agent\n"
-                "Runs a deterministic read-all-then-submit agent. "
-                "For LLM-based agent, use `run_agent.py` or `inference.py`."
-            )
-            agent_task = gr.Dropdown(
-                choices=["task1", "task2", "task3"], value="task1", label="Task"
-            )
+            gr.Markdown("### Built-in Demonstration Agent\nRuns deterministic read→submit strategy.")
+            agent_task = gr.Dropdown(["task1", "task2", "task3"], value="task1", label="Task")
             run_btn = gr.Button("🚀 Run Agent", variant="primary")
             agent_output = gr.Textbox(label="Agent Log", lines=20, interactive=False)
-            run_btn.click(run_builtin_agent, inputs=[agent_task], outputs=[agent_output])
+            run_btn.click(run_builtin_agent, [agent_task], [agent_output])
 
-        # ── Tab 3: Evaluation Dashboard ──────────────────────────────────
+        # ── Tab 3: Evaluation ─────────────────────────────────────────────────
         with gr.TabItem("📊 Evaluation"):
             with gr.Row():
-                eval_btn = gr.Button("🎯 Get Evaluation", variant="primary")
-                metrics_btn = gr.Button("📈 Get Metrics", variant="secondary")
-                traj_btn = gr.Button("🗺️ Get Trajectory", variant="secondary")
-            eval_output = gr.Textbox(label="Evaluation Report", lines=25, interactive=False)
-            eval_btn.click(get_evaluation, outputs=[eval_output])
-            metrics_btn.click(get_metrics, outputs=[eval_output])
-            traj_btn.click(get_trajectory, outputs=[eval_output])
+                eval_btn = gr.Button("🎯 Evaluation Report", variant="primary")
+                metrics_btn = gr.Button("📈 Metrics JSON", variant="secondary")
+                traj_btn = gr.Button("🗺️ Trajectory", variant="secondary")
+            eval_out = gr.Textbox(label="Output", lines=28, interactive=False)
+            eval_btn.click(get_evaluation, outputs=[eval_out])
+            metrics_btn.click(get_metrics, outputs=[eval_out])
+            traj_btn.click(get_trajectory, outputs=[eval_out])
 
-        # ── Tab 4: API Docs ──────────────────────────────────────────────
+        # ── Tab 4: 🧠 Intelligence ─────────────────────────────────────────────
+        with gr.TabItem("🧠 Intelligence"):
+            gr.Markdown(
+                "### Deep Agent Intelligence Analysis\n"
+                "Failure classification, strategy detection, and advanced behavioral metrics."
+            )
+            with gr.Row():
+                classify_btn = gr.Button("🔬 Classify Failure", variant="primary")
+                strategy_btn = gr.Button("🧭 Detect Strategy", variant="secondary")
+                adv_btn = gr.Button("⚡ Advanced Metrics", variant="secondary")
+            intel_out = gr.Textbox(label="Analysis", lines=32, interactive=False)
+            classify_btn.click(get_failure_classification, outputs=[intel_out])
+            strategy_btn.click(get_strategy_detection, outputs=[intel_out])
+            adv_btn.click(get_advanced_metrics, outputs=[intel_out])
+
+        # ── Tab 5: 🔁 Self-Improve ─────────────────────────────────────────────
+        with gr.TabItem("🔁 Self-Improve"):
+            gr.Markdown(
+                "### Self-Improvement Loop\n"
+                "After a failure, this generates an actionable improvement plan and a "
+                "system prompt injection for the agent's next attempt."
+            )
+            improve_btn = gr.Button("🔁 Generate Improvement Plan", variant="primary")
+            improve_out = gr.Textbox(label="Improvement Plan", lines=32, interactive=False)
+            improve_btn.click(get_improvement_plan, outputs=[improve_out])
+
+        # ── Tab 6: ⚖️ Compare ──────────────────────────────────────────────────
+        with gr.TabItem("⚖️ Compare Agents"):
+            gr.Markdown(
+                "### Multi-Agent Strategy Comparison\n"
+                "Runs 4 built-in agent strategies on the same task to compare "
+                "efficiency, strategy, and reliability side-by-side."
+            )
+            with gr.Row():
+                comp_task = gr.Dropdown(["task1", "task2", "task3"], value="task1", label="Task")
+                comp_agents = gr.CheckboxGroup(
+                    ["test-first", "search-first", "minimal", "exhaustive"],
+                    value=["test-first", "search-first", "minimal", "exhaustive"],
+                    label="Agents to Compare",
+                )
+            comp_btn = gr.Button("⚖️ Run Comparison", variant="primary")
+            comp_out = gr.Textbox(label="Comparison Report", lines=30, interactive=False)
+            comp_btn.click(run_comparison, [comp_task, comp_agents], [comp_out])
+
+        # ── Tab 7: 🌐 3D Visualizer ────────────────────────────────────────────
+        with gr.TabItem("🌐 3D Visualizer"):
+            gr.Markdown(
+                "### Agent Trajectory 3D Visualization\n"
+                "Files = 3D nodes · Dependencies = edges · Agent path = animated beam · "
+                "Timeline = scrubbable replay. **Run an episode first, then refresh.**"
+            )
+            refresh_viz_btn = gr.Button("🔄 Load Trajectory into Visualizer", variant="primary")
+            viz_html = gr.HTML(value="<p style='color:#64748b;text-align:center;padding:40px'>Click 'Load Trajectory' after running an episode.</p>")
+            refresh_viz_btn.click(get_viz_html, outputs=[viz_html])
+
+        # ── Tab 8: API ────────────────────────────────────────────────────────
         with gr.TabItem("📖 API"):
             gr.Markdown("""
-### REST API Endpoints
+### REST API — v3.0 Endpoints
 
-The FastAPI endpoints are mounted alongside this UI at `/api/`.
-
+#### Core (OpenEnv-compliant)
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/reset?task=task1` | POST | Start new episode |
-| `/api/step` | POST | Take action (JSON body) |
-| `/api/state` | GET | Get current state |
-| `/api/health` | GET | Health check |
-| `/api/trajectory` | GET | Full action log |
-| `/api/evaluate` | GET | Multi-dimensional scores |
-| `/api/metrics` | GET | Comprehensive stats |
-| `/api/fault-config` | POST | Enable fault injection |
+| `/reset?task=task1` | POST | Start new episode |
+| `/step` | POST | Take action |
+| `/state` | GET | Current state |
+| `/health` | GET | Health check |
 
-### Example: Reset + Read + Submit
+#### Evaluation
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/trajectory` | GET | Full action log |
+| `/evaluate` | GET | 6-dimension scores |
+| `/metrics` | GET | Memory + security stats |
+| `/fault-config` | POST | Enable fault injection |
+
+#### Intelligence (NEW in v3)
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/classify` | GET | Typed failure classification |
+| `/strategy` | GET | Behavioral strategy detection |
+| `/advanced-metrics` | GET | Entropy, reliability, consistency |
+| `/improvement-plan` | GET | Self-improvement feedback |
+| `/compare-agents` | POST | Multi-agent comparison |
+| `/viz-data` | GET | 3D visualization data |
+
 ```bash
-BASE="https://YOUR-SPACE.hf.space/api"
-
-# Reset
+BASE="http://localhost:7860"
 curl -X POST "$BASE/reset?task=task1"
-
-# Read a file
-curl -X POST "$BASE/step" -H "Content-Type: application/json" \\
-  -d '{"action_type":"read_file","path":"src/auth.py"}'
-
-# Submit
-curl -X POST "$BASE/step" -H "Content-Type: application/json" \\
-  -d '{"action_type":"submit"}'
-
-# Get evaluation
-curl "$BASE/evaluate"
+curl -X POST "$BASE/step" -H "Content-Type: application/json" -d '{"action_type":"read_file","path":"src/auth.py"}'
+curl -X POST "$BASE/step" -d '{"action_type":"submit"}'
+curl "$BASE/classify"
+curl "$BASE/strategy"
+curl "$BASE/advanced-metrics"
+curl "$BASE/improvement-plan"
+curl -X POST "$BASE/compare-agents?task=task1"
 ```
 """)
 
 
-# ── Mount FastAPI under /api ─────────────────────────────────────────────────
+# ── Mount FastAPI under same process ──────────────────────────────────────────
 from server.app import app as fastapi_app
-
 gr_app = gr.mount_gradio_app(fastapi_app, demo, path="/")
 
 if __name__ == "__main__":
