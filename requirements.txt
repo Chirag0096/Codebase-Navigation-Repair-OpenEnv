@@ -1,6 +1,8 @@
-fastapi==0.111.0
-uvicorn[standard]==0.30.1
-pydantic==2.7.1
-openai==1.35.0
-httpx==0.27.0
-pytest==8.2.2
+fastapi
+uvicorn[standard]
+pydantic
+openai
+httpx
+pytest
+gradio>=4.0
+huggingface_hub

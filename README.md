@@ -13,50 +13,92 @@ tags:
   - coding-agent
 ---
 
-# Codebase Navigation & Repair — OpenEnv Environment v2.0
+# 🔍 Codebase Navigation & Repair — OpenEnv
 
-**An RL environment + evaluation layer that makes AI coding agents reliable, testable, and debuggable.**
+> **The system that makes AI coding agents reliable, testable, and debuggable.**
 
-AI agents navigate unfamiliar Python codebases, identify bugs, and implement features — graded by running actual tests. Unlike existing benchmarks, this system provides **process-level evaluation**, not just final output scoring.
+## The Problem
 
-## Why This Exists
+AI coding agents (Copilot, Devin, Cursor) fail ~25%+ on complex tasks. Current benchmarks tell you the score but not **why** the agent failed. Was it poor navigation? Wasted steps? Hallucinated code? There is no way to know.
 
-Every coding agent (Devin, Cursor, Copilot, Codex) fails ~25%+ on complex tasks. Current benchmarks tell you the agent scored 0.4 but not **why** it failed. This environment answers:
+## Our Solution
 
-- Did the agent explore strategically or waste steps?
-- Did it verify its fixes before submitting?
-- Can it resist misleading comments and prompt injection?
-- How efficiently does it use its context window?
+An RL environment where agents navigate unfamiliar Python repos, find bugs, and fix them — graded by **actual pytest execution** with **process-level evaluation**.
 
-## Architecture
+Unlike existing benchmarks, we evaluate **how** the agent works, not just the final output:
+
+| What We Measure | Why It Matters |
+|----------------|---------------|
+| Navigation efficiency | Did it read relevant files first? |
+| Reasoning patterns | Did it follow read→write→test? |
+| Context usage | How much of what it read was useful? |
+| Security | Did it write safe code? |
+| Robustness | Can it handle misleading comments? |
+
+## How It Works
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│                    FastAPI Server                         │
-│  /reset  /step  /state  /trajectory  /evaluate  /metrics │
-└──────────┬───────────────────────────────────────────────┘
-           │
-┌──────────▼───────────────────────────────────────────────┐
-│              CodebaseNavEnvironment (extended)             │
-│                                                           │
-│  ┌─────────────┐  ┌──────────────┐  ┌─────────────────┐  │
-│  │ Trajectory   │  │  Evaluator   │  │  Security       │  │
-│  │ Logger       │  │  (process)   │  │  Scanner        │  │
-│  └─────────────┘  └──────────────┘  └─────────────────┘  │
-│  ┌─────────────┐  ┌──────────────┐  ┌─────────────────┐  │
-│  │ Fault       │  │  Memory      │  │  Grader         │  │
-│  │ Injector    │  │  Tracker     │  │  (pytest)       │  │
-│  └─────────────┘  └──────────────┘  └─────────────────┘  │
-└──────────────────────────────────────────────────────────┘
+Agent resets environment → sees repo file tree (NOT contents)
+  → reads files one at a time (costs steps)
+  → identifies bugs in source code
+  → writes fixed code
+  → runs tests to verify
+  → submits for final grade
 ```
 
-## Tasks
+### Tasks
 
-| Task | Difficulty | Description |
-|------|-----------|-------------|
-| task1 | Easy | Single-file bug repair (5 variants) |
-| task2 | Medium | Cross-module interface bug + regression test (5 variants) |
-| task3 | Hard | Feature implementation from spec (5 variants) |
+| Task | Difficulty | Description | Variants |
+|------|-----------|-------------|----------|
+| task1 | Easy | Single-file bug repair | 5 |
+| task2 | Medium | Cross-module interface bug + regression test | 5 |
+| task3 | Hard | Feature implementation from spec | 5 |
+
+Each variant has structurally different code, so the agent can't memorize solutions.
+
+## Quick Start
+
+### 1. Run Locally (No Docker)
+```bash
+pip install -r requirements.txt
+python app.py                    # Gradio UI at http://localhost:7860
+```
+
+### 2. Run Agent (No LLM needed)
+```bash
+python run_agent.py              # deterministic agent demo
+python run_agent.py --all-tasks  # run all 3 tasks
+```
+
+### 3. Run Agent with LLM
+```bash
+export HF_TOKEN=hf_xxxxx
+python run_agent.py --llm --task task1
+```
+
+### 4. Docker
+```bash
+docker build -t codebase-nav-env .
+docker run -p 7860:7860 codebase-nav-env
+```
+
+### 5. API Usage
+```bash
+# Reset
+curl -X POST "http://localhost:7860/reset?task=task1"
+
+# Take action
+curl -X POST http://localhost:7860/step \
+  -H "Content-Type: application/json" \
+  -d '{"action_type":"read_file","path":"src/auth.py"}'
+
+# Submit
+curl -X POST http://localhost:7860/step \
+  -d '{"action_type":"submit"}'
+
+# Get evaluation
+curl http://localhost:7860/evaluate
+```
 
 ## API Endpoints
 
@@ -68,76 +110,63 @@ Every coding agent (Devin, Cursor, Copilot, Codex) fails ~25%+ on complex tasks.
 | `/state` | GET | Get current state |
 | `/health` | GET | Health check |
 
-### Evaluation Layer (v2.0)
+### Evaluation Layer
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/trajectory` | GET | Full action log with timing, diffs, security flags |
+| `/trajectory` | GET | Full action log with timing and diffs |
 | `/evaluate` | GET | Multi-dimensional scores (6 axes) |
-| `/metrics` | GET | Comprehensive stats: memory, security, timeline |
-| `/fault-config` | POST | Enable fault injection: "none", "light", "heavy" |
+| `/metrics` | GET | Memory, security, timeline stats |
+| `/fault-config` | POST | Enable fault injection |
 
-## Multi-Dimensional Evaluation
+## Evaluation Dimensions
 
-The `/evaluate` endpoint scores agents across **6 quality dimensions**:
-
-| Dimension | Weight | What It Measures |
-|-----------|--------|-----------------|
-| Efficiency | 20% | Steps used vs optimal path |
-| Navigation | 15% | Read relevant files first? Explored strategically? |
-| Correctness | 30% | Final test pass rate + regression detection |
-| Reasoning | 15% | read→write→test pattern adherence |
-| Robustness | 10% | Error recovery + fault injection handling |
-| Security | 10% | Unsafe code detection + prompt injection resistance |
-
-## Fault Injection
-
-Test agent robustness by injecting controlled faults:
-
-```bash
-# Enable heavy fault injection
-curl -X POST http://localhost:7860/fault-config -d '{"level":"heavy"}'
-
-# Next reset will inject:
-# - Misleading "BUG:" comments on correct lines
-# - Red herring files that look buggy but aren't
-# - Noisy docstrings claiming code is correct
+```
+efficiency   [████████████████░░░░] 0.800  — 5 steps vs 4 optimal
+navigation   [████████████████████] 1.000  — read relevant files first
+correctness  [██████████████░░░░░░] 0.714  — 71.4% tests passing
+reasoning    [████████████████████] 1.000  — correct read→write→test pattern
+robustness   [████████████████████] 1.000  — no errors encountered
+security     [████████████████████] 1.000  — no unsafe code detected
 ```
 
-## Quick Start
+## Project Structure
 
-### Local
-```bash
-pip install -r requirements.txt
-uvicorn server.app:app --host 0.0.0.0 --port 7860
+```
+codebase-nav-env/
+├── app.py                  # Gradio UI + FastAPI (HF Space entry point)
+├── run_agent.py            # Standalone HF agent (deterministic + LLM)
+├── inference.py            # OpenEnv inference script ([START]/[STEP]/[END])
+├── server/
+│   ├── app.py              # FastAPI endpoints
+│   ├── environment.py      # Core RL environment
+│   ├── models.py           # Pydantic models
+│   ├── grader.py           # pytest runner
+│   ├── repo_loader.py      # Template loader
+│   ├── sandbox.py          # Secure subprocess
+│   ├── trajectory.py       # Full trajectory recording
+│   ├── evaluator.py        # 6-dimension scoring engine
+│   ├── fault_injection.py  # Robustness testing
+│   ├── security.py         # Unsafe code detection
+│   └── memory.py           # Context efficiency tracking
+├── repo_templates/          # 15 task variants
+│   ├── task1/               # 5 single-file bug variants
+│   ├── task2/               # 5 cross-module bug variants
+│   └── task3/               # 5 feature implementation variants
+├── openenv.yaml            # Environment metadata
+├── Dockerfile              # Docker build
+├── requirements.txt        # Dependencies
+└── README.md               # This file
 ```
 
-### Docker
-```bash
-docker build -t codebase-nav-env .
-docker run -p 7860:7860 codebase-nav-env
-```
+## Why This Is Real-World
 
-### Run Inference
-```bash
-export HF_TOKEN=your_token
-export ENV_BASE_URL=http://localhost:7860
-python inference.py
-```
+This isn't a toy benchmark. It tests the **exact capabilities** production coding agents need:
 
-## Example Output: `/evaluate`
-```json
-{
-  "composite_score": 0.874,
-  "dimensions": {
-    "efficiency": {"score": 0.8, "evidence": ["Used 5 steps vs 4 optimal"]},
-    "navigation": {"score": 1.0, "evidence": ["Good: first read was relevant file"]},
-    "correctness": {"score": 0.714, "evidence": ["No test regressions"]},
-    "reasoning": {"score": 1.0, "evidence": ["Agent tested after writing"]},
-    "robustness": {"score": 1.0, "evidence": ["Clean execution"]},
-    "security": {"score": 1.0, "evidence": ["No security violations"]}
-  }
-}
-```
+- **Navigate unfamiliar code** — agent sees only file names, not contents
+- **Budget exploration** — finite steps mean strategic reading matters
+- **Verify fixes** — must run tests, not just hope the fix works
+- **Handle noise** — real repos have misleading comments and dead code
+- **Write safe code** — production agents can't `eval()` or `os.system()`
 
 ## License
 
