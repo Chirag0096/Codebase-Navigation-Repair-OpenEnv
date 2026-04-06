@@ -1,88 +1,80 @@
-# 🚀 Codebase Navigation & Repair
+# 🚀 Codebase Navigation & Repair — OpenEnv
 
-**AI coding agents fail silently and unpredictably. And worse—no one knows *why* they fail.** 
+## 🧨 The Problem
+AI coding agents fail silently and unpredictably. 
+Worse, **no one knows WHY they fail.** 
+Current benchmarks just give a final Pass/Fail grade. Did the agent read the wrong files? Hallucinate a fix? Ignore the tests entirely? There is no way to know. 
 
-They get lost in large codebases, hallucinate fixes, and deploy broken code. Existing benchmarks only tell you if an agent failed, not *where* or *why* it went wrong. 
-
-Our solution: **The system that makes AI coding agents reliable in real-world scenarios.** We track, evaluate, and score every single step of the agent’s reasoning, navigation, and execution.
-
----
-
-## 🌟 What is it?
-Codebase Navigation & Repair is a specialized process-evaluation engine for AI coding agents (like Devin, Copilot, or Cursor). 
-
-Instead of spoon-feeding the AI the exact files it needs, we drop the agent into an unfamiliar, multi-file Python repository. The agent must independently navigate the codebase, understand the bug, write a fix, and run the test suite to verify its work—just like a human engineer. 
+## 💡 The Solution
+**We track and evaluate every step of the agent’s reasoning and actions.**
+Codebase Navigation & Repair is a system that makes AI coding agents reliable in real-world scenarios. We don't just grade the final output; we grade the *entire journey*.
 
 ---
 
-## 🛠️ Why it matters
-Right now, evaluating AI agents is binary: Pass or Fail. 
+## 🛠️ What It Is
+It is a fully OpenEnv-compliant, production-ready testing environment for AI software engineers. 
 
-We change that by evaluating the **process**:
-1. **Efficiency:** Did it read irrelevant files and waste context window?
-2. **Reasoning:** Did it follow best practices (e.g., reading tests before modifying source code)?
-3. **Security:** Did it try to inject malicious code during the repair?
-
-This transforms agent development from guesswork into targeted, measurable engineering.
+You drop an AI agent into an unfamiliar Python repository with a hidden bug. The agent cannot cheat by seeing all files at once. It must explore the codebase step-by-step, find the issue, write the fix, and run actual tests to prove it works—exactly like a human engineer.
 
 ---
 
-## 🎬 Demo Walkthrough
-
-**The Scenario:** A backend API has a bug where `order_processor.py` fails to handle negative inventory.
-
-**Step 1: The Reset (Agent enters the workspace)**
-* The agent sees a file tree (no contents) and the failing test: `test_process_valid_order`
-
-**Step 2: Investigation (Agent reads files)**
-* *Action:* `read_file tests/test_orders.py` *(Smart move: understand expected behavior first)*
-* *Action:* `read_file src/order_processor.py` *(Finds the bug location)*
-
-**Step 3: The Repair (Agent writes code)**
-* *Action:* `write_file src/order_processor.py` *(Modifies logic to add `if item.qty < 0: raise ValueError`)*
-
-**Step 4: Verification (Agent runs tests)**
-* *Action:* `run_tests tests/test_orders.py`
-* *Result:* Tests turn green! `[100% passing]`
-
-**Step 5: Submission & Evaluation**
-* The agent submits the fix.
-* **Our Engine kicks in:** It evaluates the trajectory and gives the agent a top-tier composite score for flawless navigation, strong reasoning, and optimal step efficiency.
+## 🌎 Why It Matters
+For developers building autonomous agents (like Devin, Copilot, or Cursor), **reliability** is the biggest unsolved problem. Our system provides a high-fidelity diagnostic layer so researchers can find the exact weak spots in their models and fix them.
 
 ---
 
-## 🏗️ How it works (Simplified)
+## 🎬 Demo Walkthrough: A Realistic Bug Scenario
 
-1. **The Server:** A FastAPI engine loads a sandboxed, hidden-bug repository.
-2. **The Agent:** Interacts via strict API calls (`read_file`, `write_file`, `run_tests`), simulating real console usage.
-3. **The Grader:** A sandboxed Pytest runner securely executes the agent's code.
-4. **The UI:** A live Gradio dashboard lets you watch agents work in real-time or explore dynamic evaluation metrics.
+Imagine an e-commerce agent tasked with fixing an order processing failure.
+
+**BEFORE:** ❌ `test_process_valid_order` is failing. 
+
+1. **Step 1:** Agent reads `tests/test_orders.py` to understand the expected behavior.
+2. **Step 2:** Agent reads `src/order_processor.py` and spots the bug: a missing `datetime` import causing the script to crash.
+3. **Step 3:** Agent writes the fix to `src/order_processor.py`.
+4. **Step 4:** Agent runs `pytest`.
+5. **Step 5:** Agent submits the fixed codebase.
+
+**AFTER:** ✅ All tests pass. 
+
+Our system records this perfect execution. But if an agent *fails*, our **Process-Based Evaluation** engine flags exactly what went wrong: e.g., *"Agent wasted 14 steps reading irrelevant files and submitted without testing."*
 
 ---
 
-## 🥇 Why it’s better
-
-We don't just grade the outcome; we stress-test the AI:
-- **Dynamic Fault Injection:** We actively inject misleading code comments and red herring files into the codebase to see if the AI gets tricked.
-- **Trajectory Replay:** We record every API call, diff, and timestamp so you can "play back" an agent's failure.
-- **Proactive Security:** We monitor the agent's output for dangerous patterns (like `os.system("rm -rf /")`) to ensure production safety.
+## 🏗️ How It Works (Simplified)
+1. **The Server:** A FastAPI engine loads a Python repository with a verifiable bug.
+2. **The Agent:** An AI model (we provide a Hugging Face Inference agent) requests the current state and explores the repo tree.
+3. **The Loop:** The agent interacts via structured actions (`read_file`, `write_file`, `run_tests`).
+4. **The Evaluation:** Every action is logged, timed, and scored against our 6-axis Reliability Grader.
+5. **The UI:** A beautiful Gradio interface lets you watch the AI operate in real-time or explore its trajectory post-flight.
 
 ---
 
-## ⏰ Why Now
-Autonomous coding agents are the fastest-growing sector in AI. But **reliability is the biggest unsolved problem holding them back from enterprise adoption.** A system that can definitively evaluate *how* an agent reasons and *why* it fails is the missing infrastructure for the next generation of AI product development.
+## 🥇 Why It’s Better (Our USP)
+
+We test **Process and Reliability, not just Correctness**. 
+
+- **Flight Data Recorder:** Full trajectory replay. Debug the AI's thought process step-by-step.
+- **Dynamic Fault Injection:** Real code is messy. We inject misleading comments and red herring files to see if the AI gets distracted.
+- **Proactive Security:** We scan the AI's output for dangerous patterns (like `os.system`) to prevent destructive actions.
+- **Context Efficiency:** We penalize agents that waste API tokens by reading identical files over and over.
+
+---
+
+## ⏱️ Why Now?
+The rise of autonomous agents is here. But enterprise adoption is stalled because these agents are unpredictable. Moving from "cool toy" to "reliable teammate" requires rigorous, process-level evaluation. Our system directly solves the reliability bottleneck.
 
 ---
 
 ## 🤝 Hackathon Alignment
-We built this explicitly for the Meta OpenEnv standard:
-- **OpenEnv Compliant:** Implements standard `/reset`, `/step`, and `/state` APIs out-of-the-box.
-- **Hugging Face Ready:** Fully dockerized, sandboxed, and deployed via Gradio to HF Spaces.
-- **HF Inference Agent:** Includes a standalone Python script (`run_agent.py`) using Hugging Face inference endpoints—no OpenAI lock-in required.
+We built this explicitly for the Meta OpenEnv hackathon:
+- **100% OpenEnv Compliant:** Implements standard `/reset`, `/step`, and `/state` APIs.
+- **Live & Deployed:** Running live on Hugging Face Spaces with a Gradio frontend.
+- **Inference Ready:** Built-in agent using Hugging Face inference (`run_agent.py`).
+- **Sandboxed:** Secure, dockerized test execution.
 
 ---
 
 ## 🚀 Why This Wins
-This project isn't just a hackathon toy—it is a piece of **core infrastructure** the AI industry actually needs right now. 
-
-It combines **real-world relevance** (fixing broken tests in messy, multi-file repos) with **deep technical rigor** (process-based evaluation, fault injection, secure sandboxing). We've taken the base OpenEnv standard and turned it into a completely observable, visually impressive, state-of-the-art testing layer that is impossible to ignore.
+This is not infrastructure; it is a **diagnostic product for the AI era**. 
+It features immense technical depth (sandboxed execution, multi-dimensional scoring, fault injection), massive real-world relevance, and a polished user experience. It doesn't just test AI agents—it shows us how to make them better.
