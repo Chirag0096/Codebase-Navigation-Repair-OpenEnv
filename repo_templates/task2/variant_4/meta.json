@@ -1,0 +1,13 @@
+{
+  "variant_id": "task2_v4",
+  "task": "task2",
+  "bug_files": ["src/report_builder.py"],
+  "interface_files": ["src/date_formatter.py"],
+  "bug_description": "report_builder passes ISO string but date_formatter expects datetime object",
+  "failing_tests": ["test_build_monthly_report", "test_report_structure"],
+  "fix_file": "src/report_builder.py",
+  "fix_description": "Parse ISO strings to datetime before passing: datetime.strptime(start_date, '%Y-%m-%d')",
+  "regression_test_must_cover": "TypeError when string is passed to format_date_range",
+  "total_files": 4,
+  "optimal_steps": 6
+}

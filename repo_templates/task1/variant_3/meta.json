@@ -1,0 +1,15 @@
+{
+  "variant_id": "task1_v3",
+  "task": "task1",
+  "bug_files": ["src/inventory.py"],
+  "bug_description": "check_stock uses >= 0 instead of > 0; get_low_stock_items uses <= instead of <",
+  "failing_tests": ["test_out_of_stock", "test_low_stock_items"],
+  "correct_lines": {
+    "src/inventory.py": {
+      "return inventory[item_id] >= 0": "return inventory[item_id] > 0",
+      "if qty <= threshold": "if qty < threshold"
+    }
+  },
+  "total_files": 3,
+  "optimal_steps": 4
+}

@@ -1,0 +1,15 @@
+{
+  "variant_id": "task1_v5",
+  "task": "task1",
+  "bug_files": ["src/formatter.py"],
+  "bug_description": "truncate doesn't account for ellipsis length; extract_between doesn't offset past start marker",
+  "failing_tests": ["test_truncate_long", "test_extract_between"],
+  "correct_lines": {
+    "src/formatter.py": {
+      "return text[:max_length] + \"...\"": "return text[:max_length - 3] + \"...\"",
+      "content_start = start_idx": "content_start = start_idx + len(start_marker)"
+    }
+  },
+  "total_files": 3,
+  "optimal_steps": 4
+}

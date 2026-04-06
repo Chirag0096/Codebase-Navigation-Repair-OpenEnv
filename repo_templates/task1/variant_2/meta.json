@@ -1,0 +1,15 @@
+{
+  "variant_id": "task1_v2",
+  "task": "task1",
+  "bug_files": ["src/calculator.py"],
+  "bug_description": "divide() missing zero-division check; average() crashes on empty list",
+  "failing_tests": ["test_divide_by_zero", "test_average_empty"],
+  "correct_lines": {
+    "src/calculator.py": {
+      "return numerator / denominator": "if denominator == 0:\n        return 0.0\n    return numerator / denominator",
+      "total = sum(numbers)\n    return total / len(numbers)": "if not numbers:\n        return 0.0\n    total = sum(numbers)\n    return total / len(numbers)"
+    }
+  },
+  "total_files": 3,
+  "optimal_steps": 4
+}

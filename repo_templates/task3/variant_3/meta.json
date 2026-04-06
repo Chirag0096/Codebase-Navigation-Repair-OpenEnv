@@ -1,0 +1,11 @@
+{
+  "variant_id": "task3_v3",
+  "task": "task3",
+  "feature_spec_file": "FEATURE_SPEC.md",
+  "files_to_implement": ["src/validators.py", "src/handlers.py"],
+  "read_first_files": ["src/config.py", "FEATURE_SPEC.md", "tests/test_handlers.py"],
+  "test_file": "tests/test_handlers.py",
+  "total_tests": 6,
+  "total_files": 5,
+  "optimal_steps": 8
+}

@@ -1,0 +1,56 @@
+name: codebase-nav-env
+version: "1.0.0"
+description: >
+  An RL environment where an LLM agent navigates an unfamiliar Python codebase,
+  finds bugs, and implements features by reading files and running tests.
+  Graded by actual pytest execution — fully deterministic.
+
+author: your-hf-username
+license: MIT
+
+tasks:
+  - id: task1
+    name: "Single-file bug repair"
+    description: "Find and fix bugs in a Python module so all tests pass."
+    difficulty: easy
+    max_steps: 20
+    reward_range: [0.0, 1.0]
+
+  - id: task2
+    name: "Cross-module interface bug"
+    description: "Fix a type mismatch between two modules and add a regression test."
+    difficulty: medium
+    max_steps: 25
+    reward_range: [0.0, 1.0]
+
+  - id: task3
+    name: "Feature implementation from spec"
+    description: "Read FEATURE_SPEC.md and implement the feature across multiple files."
+    difficulty: hard
+    max_steps: 30
+    reward_range: [0.0, 1.0]
+
+action_space:
+  type: text
+  schema:
+    action_type: string
+    path: string (optional)
+    content: string (optional)
+    query: string (optional)
+
+observation_space:
+  type: structured
+  fields:
+    - repo_tree: list of file paths
+    - task_description: string
+    - failing_tests: list of test names
+    - files_read: list of paths read so far
+    - last_action_result: string
+    - steps_remaining: integer
+    - current_task: string
+
+endpoints:
+  reset: POST /reset
+  step: POST /step
+  state: GET /state
+  health: GET /health

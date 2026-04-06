@@ -1,0 +1,13 @@
+{
+  "variant_id": "task2_v5",
+  "task": "task2",
+  "bug_files": ["src/cache_manager.py"],
+  "interface_files": ["src/serializer.py"],
+  "bug_description": "cache_manager passes bytes (.encode()) but serializer expects str",
+  "failing_tests": ["test_cache_set_and_get", "test_cache_delete"],
+  "fix_file": "src/cache_manager.py",
+  "fix_description": "Remove .encode('utf-8') — pass str(value) directly to serialize_value",
+  "regression_test_must_cover": "TypeError when bytes is passed to serialize_value",
+  "total_files": 4,
+  "optimal_steps": 6
+}

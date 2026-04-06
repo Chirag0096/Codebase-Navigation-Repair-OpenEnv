@@ -1,0 +1,15 @@
+{
+  "variant_id": "task1_v4",
+  "task": "task1",
+  "bug_files": ["src/scheduler.py"],
+  "bug_description": "is_available uses <= instead of < for adjacent slot check; days_until has off-by-one (+1)",
+  "failing_tests": ["test_adjacent_slots_allowed", "test_days_until", "test_days_until_same_day"],
+  "correct_lines": {
+    "src/scheduler.py": {
+      "if start <= slot_end and end >= slot_start:": "if start < slot_end and end > slot_start:",
+      "return delta.days + 1": "return delta.days"
+    }
+  },
+  "total_files": 3,
+  "optimal_steps": 4
+}

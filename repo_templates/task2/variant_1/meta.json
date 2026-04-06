@@ -1,0 +1,13 @@
+{
+  "variant_id": "task2_v1",
+  "task": "task2",
+  "bug_files": ["src/data_pipeline.py"],
+  "interface_files": ["src/validator.py"],
+  "bug_description": "data_pipeline passes str(record_id) but validator.py expects int",
+  "failing_tests": ["test_process_valid_batch"],
+  "fix_file": "src/data_pipeline.py",
+  "fix_description": "Remove str() wrapping — pass record['id'] directly",
+  "regression_test_must_cover": "TypeError raised when string is passed to validate_record",
+  "total_files": 4,
+  "optimal_steps": 6
+}

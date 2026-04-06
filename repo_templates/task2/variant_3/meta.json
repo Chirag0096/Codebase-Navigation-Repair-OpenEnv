@@ -1,0 +1,13 @@
+{
+  "variant_id": "task2_v3",
+  "task": "task2",
+  "bug_files": ["src/order_processor.py"],
+  "interface_files": ["src/inventory_checker.py"],
+  "bug_description": "order_processor passes list of items but inventory_checker expects dict {sku: qty}",
+  "failing_tests": ["test_process_valid_order", "test_order_structure"],
+  "fix_file": "src/order_processor.py",
+  "fix_description": "Convert items list to dict: {item['sku']: item['qty'] for item in items}",
+  "regression_test_must_cover": "TypeError when list is passed to check_availability",
+  "total_files": 4,
+  "optimal_steps": 6
+}

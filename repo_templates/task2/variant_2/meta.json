@@ -1,0 +1,13 @@
+{
+  "variant_id": "task2_v2",
+  "task": "task2",
+  "bug_files": ["src/email_sender.py"],
+  "interface_files": ["src/template_engine.py"],
+  "bug_description": "email_sender passes name= kwarg but template_engine expects username=",
+  "failing_tests": ["test_send_welcome_email", "test_welcome_email_structure"],
+  "fix_file": "src/email_sender.py",
+  "fix_description": "Change name=user_name to username=user_name in send_welcome_email",
+  "regression_test_must_cover": "KeyError when wrong kwarg name is used",
+  "total_files": 4,
+  "optimal_steps": 6
+}

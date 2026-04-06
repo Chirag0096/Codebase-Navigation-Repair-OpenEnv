@@ -1,0 +1,11 @@
+{
+  "variant_id": "task3_v4",
+  "task": "task3",
+  "feature_spec_file": "FEATURE_SPEC.md",
+  "files_to_implement": ["src/http_client.py"],
+  "read_first_files": ["src/retry_config.py", "FEATURE_SPEC.md", "tests/test_retry.py"],
+  "test_file": "tests/test_retry.py",
+  "total_tests": 5,
+  "total_files": 4,
+  "optimal_steps": 8
+}

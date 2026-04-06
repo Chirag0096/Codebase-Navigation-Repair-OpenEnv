@@ -1,0 +1,15 @@
+{
+  "variant_id": "task1_v1",
+  "task": "task1",
+  "bug_files": ["src/auth.py"],
+  "bug_description": "validate_token uses != instead of == and get_user_permissions has off-by-one",
+  "failing_tests": ["test_valid_token", "test_user_permissions"],
+  "correct_lines": {
+    "src/auth.py": {
+      "return token != secret": "return token == secret",
+      "return permissions[user_id + 1]": "return permissions[user_id]"
+    }
+  },
+  "total_files": 3,
+  "optimal_steps": 4
+}
