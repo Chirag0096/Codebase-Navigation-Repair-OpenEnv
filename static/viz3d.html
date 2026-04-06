@@ -6,862 +6,601 @@
 <title>Agent Trajectory 3D Visualizer</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
+  html, body {
+    width: 100%; height: 100%;
     background: #0a0e1a;
     color: #e0e6f0;
     font-family: 'Segoe UI', system-ui, sans-serif;
     overflow: hidden;
-    height: 100vh;
   }
-  #canvas-container {
-    position: absolute;
+  #three-canvas {
+    position: fixed;
     top: 0; left: 0;
     width: 100%; height: 100%;
-  }
-  #ui-overlay {
-    position: absolute;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    pointer-events: none;
-    z-index: 10;
+    display: block;
   }
   /* Header */
   #header {
-    position: absolute;
-    top: 12px; left: 50%;
+    position: fixed;
+    top: 10px; left: 50%;
     transform: translateX(-50%);
     text-align: center;
+    z-index: 20;
     pointer-events: none;
   }
   #header h1 {
-    font-size: 16px;
-    font-weight: 700;
+    font-size: 14px; font-weight: 700;
     color: #7dd3fc;
     letter-spacing: 0.05em;
-    text-shadow: 0 0 20px rgba(125,211,252,0.5);
+    text-shadow: 0 0 16px rgba(125,211,252,0.6);
   }
-  #header p {
-    font-size: 11px;
-    color: #64748b;
-    margin-top: 2px;
-  }
-  /* Legend */
-  #legend {
-    position: absolute;
-    top: 12px; right: 16px;
-    background: rgba(10,14,26,0.85);
-    border: 1px solid rgba(125,211,252,0.2);
-    border-radius: 8px;
-    padding: 10px 14px;
-    font-size: 11px;
-    pointer-events: none;
-  }
-  #legend h3 { color: #7dd3fc; margin-bottom: 8px; font-size: 11px; }
-  .legend-item {
-    display: flex; align-items: center; gap: 8px;
-    margin-bottom: 5px;
-  }
-  .legend-dot {
-    width: 10px; height: 10px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-  /* Info panel */
-  #info-panel {
-    position: absolute;
-    top: 12px; left: 16px;
-    background: rgba(10,14,26,0.85);
-    border: 1px solid rgba(125,211,252,0.2);
-    border-radius: 8px;
-    padding: 12px 16px;
-    min-width: 220px;
-    pointer-events: none;
-  }
-  #info-panel h3 { color: #7dd3fc; margin-bottom: 8px; font-size: 11px; letter-spacing: 0.1em; }
-  .info-row {
-    display: flex; justify-content: space-between; gap: 12px;
-    font-size: 11px;
-    margin-bottom: 4px;
-    color: #94a3b8;
-  }
-  .info-value { color: #e0e6f0; font-weight: 600; }
-  /* Timeline */
-  #timeline-panel {
-    position: absolute;
-    bottom: 20px; left: 50%;
-    transform: translateX(-50%);
-    background: rgba(10,14,26,0.9);
+  /* Panel base */
+  .panel {
+    position: fixed;
+    background: rgba(10,14,26,0.88);
     border: 1px solid rgba(125,211,252,0.2);
     border-radius: 10px;
-    padding: 14px 20px;
-    width: min(700px, 90vw);
-    pointer-events: all;
-  }
-  #timeline-panel .tl-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
-  }
-  #timeline-panel h3 {
+    padding: 10px 14px;
     font-size: 11px;
-    color: #7dd3fc;
-    letter-spacing: 0.1em;
+    z-index: 20;
+    backdrop-filter: blur(6px);
   }
-  #step-label {
-    font-size: 12px;
-    color: #f0abfc;
-    font-weight: 700;
+  .panel h3 {
+    font-size: 10px; letter-spacing: 0.1em;
+    color: #7dd3fc; margin-bottom: 8px;
+    text-transform: uppercase;
   }
-  #timeline-slider {
-    width: 100%;
-    -webkit-appearance: none;
-    height: 4px;
-    background: linear-gradient(to right, #7dd3fc 0%, #7dd3fc var(--pct,0%), #1e293b var(--pct,0%));
-    border-radius: 4px;
-    outline: none;
-    cursor: pointer;
-  }
-  #timeline-slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 16px; height: 16px;
-    border-radius: 50%;
-    background: #7dd3fc;
-    cursor: pointer;
-    box-shadow: 0 0 10px rgba(125,211,252,0.7);
-  }
-  #step-actions {
-    display: flex;
-    gap: 8px;
-    margin-top: 10px;
-    justify-content: center;
-  }
-  .tl-btn {
-    background: rgba(125,211,252,0.1);
-    border: 1px solid rgba(125,211,252,0.3);
-    color: #7dd3fc;
-    padding: 5px 14px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 11px;
-    transition: all 0.2s;
-  }
-  .tl-btn:hover { background: rgba(125,211,252,0.25); }
-  .tl-btn.active { background: rgba(125,211,252,0.3); }
+  /* Info panel */
+  #info-panel { top: 10px; left: 14px; min-width: 190px; }
+  .info-row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 4px; color: #94a3b8; }
+  .info-val { color: #e0e6f0; font-weight: 600; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Legend */
+  #legend { top: 10px; right: 14px; }
+  .leg { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; }
+  .leg-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .leg-line { width: 18px; height: 3px; border-radius: 2px; flex-shrink: 0; }
+  /* Score ring */
+  #score-ring { position: fixed; bottom: 150px; left: 14px; z-index: 20; }
   /* Step log */
   #step-log {
-    position: absolute;
-    bottom: 130px; right: 16px;
-    background: rgba(10,14,26,0.85);
-    border: 1px solid rgba(125,211,252,0.2);
-    border-radius: 8px;
-    padding: 10px 14px;
-    width: 260px;
-    max-height: 240px;
-    overflow-y: auto;
-    pointer-events: none;
-    font-size: 10px;
-  }
-  #step-log h3 { color: #7dd3fc; margin-bottom: 8px; font-size: 11px; }
-  .log-entry {
-    display: flex;
-    align-items: flex-start;
-    gap: 6px;
-    margin-bottom: 6px;
-    padding-bottom: 6px;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-  }
-  .log-entry:last-child { border-bottom: none; }
-  .log-step { color: #475569; min-width: 28px; }
-  .log-action { font-weight: 600; }
-  .log-reward { margin-left: auto; font-weight: 700; }
-  .reward-pos { color: #4ade80; }
-  .reward-neg { color: #f87171; }
-  .reward-zero { color: #94a3b8; }
-  /* Tooltip */
-  #tooltip {
-    position: absolute;
-    background: rgba(10,14,26,0.95);
-    border: 1px solid rgba(125,211,252,0.4);
-    border-radius: 6px;
-    padding: 8px 12px;
-    font-size: 11px;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.15s;
-    max-width: 200px;
+    position: fixed; bottom: 150px; right: 14px;
+    width: 230px; max-height: 200px; overflow-y: auto;
     z-index: 20;
   }
-  #tooltip h4 { color: #7dd3fc; margin-bottom: 4px; }
-  /* Score ring */
-  #score-ring {
-    position: absolute;
-    bottom: 130px; left: 16px;
-    pointer-events: none;
+  .log-e { display: flex; gap: 5px; margin-bottom: 5px; padding-bottom: 5px; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 10px; }
+  .log-e:last-child { border-bottom: none; }
+  .log-s { color: #475569; min-width: 24px; }
+  .log-a { font-weight: 600; flex: 1; }
+  .rp { color: #4ade80; } .rn { color: #f87171; } .rz { color: #94a3b8; }
+  /* Timeline */
+  #timeline {
+    position: fixed; bottom: 16px; left: 50%;
+    transform: translateX(-50%);
+    width: min(680px, 92vw);
+    z-index: 20;
   }
-  #score-ring svg text { font-family: 'Segoe UI', sans-serif; }
+  #tl-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  #tl-header h3 { font-size: 10px; color: #7dd3fc; letter-spacing: 0.1em; }
+  #step-label { font-size: 11px; color: #f0abfc; font-weight: 700; }
+  #slider {
+    width: 100%; -webkit-appearance: none; height: 4px;
+    background: linear-gradient(to right, #7dd3fc 0%, #7dd3fc var(--pct,0%), #1e293b var(--pct,0%));
+    border-radius: 4px; outline: none; cursor: pointer;
+  }
+  #slider::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 15px; height: 15px;
+    border-radius: 50%; background: #7dd3fc; cursor: pointer;
+    box-shadow: 0 0 8px rgba(125,211,252,0.8);
+  }
+  #tl-btns { display: flex; gap: 7px; margin-top: 8px; justify-content: center; }
+  .tb {
+    background: rgba(125,211,252,0.1);
+    border: 1px solid rgba(125,211,252,0.3);
+    color: #7dd3fc; padding: 4px 12px;
+    border-radius: 6px; cursor: pointer; font-size: 10px;
+    transition: all 0.15s;
+  }
+  .tb:hover { background: rgba(125,211,252,0.25); }
+  .tb.active { background: rgba(125,211,252,0.3); }
+  /* Tooltip */
+  #tooltip {
+    position: fixed; z-index: 30;
+    background: rgba(10,14,26,0.95);
+    border: 1px solid rgba(125,211,252,0.4);
+    border-radius: 6px; padding: 7px 11px;
+    font-size: 10px; pointer-events: none;
+    opacity: 0; transition: opacity 0.1s;
+    max-width: 180px;
+  }
+  #tt-title { color: #7dd3fc; margin-bottom: 3px; font-weight: 700; }
   /* Loader */
   #loader {
-    position: absolute;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    color: #7dd3fc;
-    font-size: 14px;
-    text-align: center;
+    position: fixed; top: 50%; left: 50%;
+    transform: translate(-50%,-50%);
+    text-align: center; z-index: 50; color: #7dd3fc; font-size: 13px;
   }
-  .loader-spinner {
-    width: 40px; height: 40px;
-    border: 3px solid rgba(125,211,252,0.2);
+  .spin {
+    width: 36px; height: 36px; margin: 0 auto 10px;
+    border: 3px solid rgba(125,211,252,0.15);
     border-top-color: #7dd3fc;
     border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-    margin: 0 auto 12px;
+    animation: sp 0.7s linear infinite;
   }
-  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes sp { to { transform: rotate(360deg); } }
+  #no-data {
+    position: fixed; top: 50%; left: 50%;
+    transform: translate(-50%,-50%);
+    text-align: center; color: #475569; font-size: 13px;
+    display: none;
+  }
 </style>
 </head>
 <body>
 
-<!-- Hidden data injection point -->
-<div id="viz-data" style="display:none"></div>
+<canvas id="three-canvas"></canvas>
 
-<div id="canvas-container">
-  <canvas id="three-canvas"></canvas>
+<div id="loader"><div class="spin"></div><p>Loading 3D...</p></div>
+<div id="no-data">
+  <p style="font-size:28px;margin-bottom:12px">🔍</p>
+  <p style="color:#7dd3fc;font-weight:700;margin-bottom:6px">No Episode Loaded</p>
+  <p>Run an episode first, then click<br><strong style="color:#7dd3fc">Load Trajectory</strong></p>
 </div>
 
-<div id="loader">
-  <div class="loader-spinner"></div>
-  <p>Initializing 3D Visualizer...</p>
+<div id="header"><h1>🔍 Agent Trajectory Visualizer — 3D</h1></div>
+
+<!-- Info panel -->
+<div class="panel" id="info-panel">
+  <h3>Episode Stats</h3>
+  <div class="info-row"><span>Task</span><span class="info-val" id="st-task">—</span></div>
+  <div class="info-row"><span>Variant</span><span class="info-val" id="st-var">—</span></div>
+  <div class="info-row"><span>Steps</span><span class="info-val" id="st-steps">—</span></div>
+  <div class="info-row"><span>Score</span><span class="info-val" id="st-score">—</span></div>
+  <div class="info-row"><span>Strategy</span><span class="info-val" id="st-strat">—</span></div>
 </div>
 
-<div id="ui-overlay">
-  <!-- Header -->
-  <div id="header">
-    <h1>🔍 Agent Trajectory Visualizer — 3D</h1>
-    <p>Files = nodes · Dependencies = edges · Agent path = animated beam</p>
-  </div>
+<!-- Legend -->
+<div class="panel" id="legend">
+  <h3>Legend</h3>
+  <div class="leg"><div class="leg-dot" style="background:#f97316"></div><span>Source file</span></div>
+  <div class="leg"><div class="leg-dot" style="background:#3b82f6"></div><span>Test file</span></div>
+  <div class="leg"><div class="leg-dot" style="background:#a855f7"></div><span>Spec / Docs</span></div>
+  <div class="leg"><div class="leg-dot" style="background:#22c55e"></div><span>Visited</span></div>
+  <div class="leg"><div class="leg-dot" style="background:#ef4444"></div><span>Bug / Modified</span></div>
+  <div class="leg"><div class="leg-line" style="background:#facc15"></div><span>Agent path</span></div>
+</div>
 
-  <!-- Info panel -->
-  <div id="info-panel">
-    <h3>EPISODE STATS</h3>
-    <div class="info-row"><span>Task</span><span class="info-value" id="stat-task">—</span></div>
-    <div class="info-row"><span>Variant</span><span class="info-value" id="stat-variant">—</span></div>
-    <div class="info-row"><span>Steps</span><span class="info-value" id="stat-steps">—</span></div>
-    <div class="info-row"><span>Score</span><span class="info-value" id="stat-score">—</span></div>
-    <div class="info-row"><span>Strategy</span><span class="info-value" id="stat-strategy">—</span></div>
-    <div class="info-row"><span>Failure</span><span class="info-value" id="stat-failure">—</span></div>
-  </div>
+<!-- Score ring -->
+<div id="score-ring">
+  <svg width="76" height="76" viewBox="0 0 76 76">
+    <circle cx="38" cy="38" r="30" fill="none" stroke="rgba(125,211,252,0.12)" stroke-width="6"/>
+    <circle id="score-arc" cx="38" cy="38" r="30" fill="none"
+      stroke="#7dd3fc" stroke-width="6"
+      stroke-dasharray="0 188"
+      stroke-linecap="round"
+      transform="rotate(-90 38 38)"
+      style="transition:stroke-dasharray 1.2s ease"/>
+    <text id="score-txt" x="38" y="43" text-anchor="middle"
+      fill="#e0e6f0" font-size="13" font-weight="700"
+      font-family="'Segoe UI',sans-serif">0.0</text>
+  </svg>
+</div>
 
-  <!-- Legend -->
-  <div id="legend">
-    <h3>LEGEND</h3>
-    <div class="legend-item">
-      <div class="legend-dot" style="background:#f97316"></div><span>Source file</span>
-    </div>
-    <div class="legend-item">
-      <div class="legend-dot" style="background:#3b82f6"></div><span>Test file</span>
-    </div>
-    <div class="legend-item">
-      <div class="legend-dot" style="background:#a855f7"></div><span>Spec / Docs</span>
-    </div>
-    <div class="legend-item">
-      <div class="legend-dot" style="background:#22c55e"></div><span>Visited</span>
-    </div>
-    <div class="legend-item">
-      <div class="legend-dot" style="background:#ef4444"></div><span>Modified / Bug</span>
-    </div>
-    <div class="legend-item">
-      <div class="legend-dot" style="background:#facc15; width:20px; height:4px; border-radius:2px;"></div><span>Agent path</span>
-    </div>
-  </div>
+<!-- Step log -->
+<div class="panel" id="step-log">
+  <h3>Step Log</h3>
+  <div id="log-list"></div>
+</div>
 
-  <!-- Score ring -->
-  <div id="score-ring">
-    <svg width="80" height="80" viewBox="0 0 80 80">
-      <circle cx="40" cy="40" r="34" fill="none"
-        stroke="rgba(125,211,252,0.15)" stroke-width="6"/>
-      <circle id="score-arc" cx="40" cy="40" r="34" fill="none"
-        stroke="#7dd3fc" stroke-width="6"
-        stroke-dasharray="0 214"
-        stroke-linecap="round"
-        transform="rotate(-90 40 40)"
-        style="transition: stroke-dasharray 1s ease;"/>
-      <text id="score-text" x="40" y="45" text-anchor="middle"
-        fill="#e0e6f0" font-size="14" font-weight="700">0.0</text>
-    </svg>
-  </div>
+<!-- Tooltip -->
+<div id="tooltip"><div id="tt-title"></div><div id="tt-body"></div></div>
 
-  <!-- Step log -->
-  <div id="step-log">
-    <h3>STEP LOG</h3>
-    <div id="log-entries"></div>
+<!-- Timeline -->
+<div class="panel" id="timeline">
+  <div id="tl-header">
+    <h3>Timeline Replay</h3>
+    <span id="step-label">Step 0 / 0</span>
   </div>
-
-  <!-- Tooltip -->
-  <div id="tooltip">
-    <h4 id="tooltip-title">File</h4>
-    <div id="tooltip-body"></div>
-  </div>
-
-  <!-- Timeline -->
-  <div id="timeline-panel">
-    <div class="tl-header">
-      <h3>TIMELINE REPLAY</h3>
-      <span id="step-label">Step 0 / 0</span>
-    </div>
-    <input type="range" id="timeline-slider" min="0" max="0" value="0"
-      oninput="onSliderChange(this.value)">
-    <div id="step-actions">
-      <button class="tl-btn" onclick="stepBack()">◀ Back</button>
-      <button class="tl-btn" id="play-btn" onclick="togglePlay()">▶ Play</button>
-      <button class="tl-btn" onclick="stepForward()">Forward ▶</button>
-      <button class="tl-btn" onclick="resetView()">↺ Reset</button>
-      <button class="tl-btn" id="orbit-btn" onclick="toggleOrbit()">🔄 Orbit</button>
-    </div>
+  <input type="range" id="slider" min="0" max="0" value="0"
+    oninput="onSlider(this.value)">
+  <div id="tl-btns">
+    <button class="tb" onclick="stepBack()">◀ Back</button>
+    <button class="tb" id="play-btn" onclick="togglePlay()">▶ Play</button>
+    <button class="tb" onclick="stepFwd()">Forward ▶</button>
+    <button class="tb" onclick="resetView()">↺ Reset</button>
+    <button class="tb" id="orbit-btn" onclick="toggleOrbit()">🔄 Orbit</button>
   </div>
 </div>
 
-<!-- Three.js from CDN -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
-// ── Sample data (replaced by real data from backend) ───────────────────────
-const DEFAULT_DATA = {
-  task: "task1",
-  variant_id: "variant_1",
-  final_score: 0.714,
-  strategy: "TARGETED_DEBUGGING",
-  failure_type: "CORRECT",
-  files: [
-    { name: "tests/test_formatter.py", type: "test" },
-    { name: "src/formatter.py", type: "src", is_bug_file: true },
-    { name: "src/utils.py", type: "src" }
-  ],
-  dependencies: [
-    { from: "tests/test_formatter.py", to: "src/formatter.py" },
-    { from: "src/formatter.py", to: "src/utils.py" }
-  ],
-  steps: [
-    { step: 1, action: "read_file", path: "tests/test_formatter.py", reward: 0.0 },
-    { step: 2, action: "read_file", path: "src/formatter.py", reward: 0.05 },
-    { step: 3, action: "search_code", path: null, reward: 0.0 },
-    { step: 4, action: "run_tests", path: "tests/test_formatter.py", reward: 0.0 },
-    { step: 5, action: "submit", path: null, reward: 0.694 }
-  ]
-};
-
-// ── Load data from injection point or use default ────────────────────────────
-function loadVizData() {
-  const el = document.getElementById('viz-data');
-  if (el && el.textContent.trim()) {
-    try { return JSON.parse(el.textContent); } catch(e) {}
-  }
-  return DEFAULT_DATA;
-}
-
-// ── Three.js setup ───────────────────────────────────────────────────────────
+// ── Renderer ──────────────────────────────────────────────────────────────────
 const canvas = document.getElementById('three-canvas');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setClearColor(0x0a0e1a, 1);
 
-const scene = new THREE.Scene();
-const fov = 60;
-const camera = new THREE.PerspectiveCamera(fov, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.position.set(0, 8, 22);
-camera.lookAt(0, 0, 0);
+function resize() {
+  renderer.setSize(window.innerWidth, window.innerHeight, false);
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
 
-// Ambient + directional light
-scene.add(new THREE.AmbientLight(0x1a2040, 1));
-const dirLight = new THREE.DirectionalLight(0x7dd3fc, 0.6);
-dirLight.position.set(5, 10, 5);
-scene.add(dirLight);
+// ── Scene + Camera ─────────────────────────────────────────────────────────────
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(58, 1, 0.1, 1000);
+camera.position.set(0, 8, 24);
+camera.lookAt(0, 0, 0);
+resize();
+
+// Lights
+scene.add(new THREE.AmbientLight(0x1a2040, 1.2));
+const dl = new THREE.DirectionalLight(0x7dd3fc, 0.5);
+dl.position.set(5, 12, 5);
+scene.add(dl);
 
 // Grid
-const grid = new THREE.GridHelper(40, 20, 0x1e293b, 0x1e293b);
-grid.position.y = -3;
+const grid = new THREE.GridHelper(50, 25, 0x1e293b, 0x0f172a);
+grid.position.y = -3.5;
 scene.add(grid);
 
 // Stars
-const starGeo = new THREE.BufferGeometry();
-const starCount = 800;
-const starPositions = new Float32Array(starCount * 3);
-for (let i = 0; i < starCount * 3; i++) starPositions[i] = (Math.random() - 0.5) * 200;
-starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
-const starMat = new THREE.PointsMaterial({ color: 0x334155, size: 0.3 });
-scene.add(new THREE.Points(starGeo, starMat));
+(function() {
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(900 * 3);
+  for (let i = 0; i < 900 * 3; i++) pos[i] = (Math.random() - 0.5) * 220;
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  scene.add(new THREE.Points(geo, new THREE.PointsMaterial({ color: 0x1e3a5f, size: 0.25 })));
+})();
 
-// ── Color palette ─────────────────────────────────────────────────────────────
-const COLORS = {
-  src:       0xf97316,
-  test:      0x3b82f6,
-  spec:      0xa855f7,
-  visited:   0x22c55e,
-  modified:  0xef4444,
-  bug:       0xef4444,
-  edge:      0x334155,
-  path:      0xfacc15,
-  agent:     0xfbbf24,
-};
+// ── Orbit controls (manual) ───────────────────────────────────────────────────
+let sph = { theta: 0, phi: 1.1, r: 24 };
+let orbitAuto = false, dragging = false, lastX = 0, lastY = 0;
 
-// ── Orbit control (manual implementation) ────────────────────────────────────
-let isOrbiting = false;
-let orbitActive = false;
-let mouse = { x: 0, y: 0, down: false, lastX: 0, lastY: 0 };
-let spherical = { theta: 0, phi: Math.PI / 4, r: 22 };
-
-canvas.addEventListener('mousedown', e => { mouse.down = true; mouse.lastX = e.clientX; mouse.lastY = e.clientY; });
-canvas.addEventListener('mouseup', () => { mouse.down = false; });
-canvas.addEventListener('mousemove', e => {
-  if (!mouse.down) {
-    // Hover for tooltip
-    checkHover(e.clientX, e.clientY);
-    return;
-  }
-  const dx = e.clientX - mouse.lastX;
-  const dy = e.clientY - mouse.lastY;
-  spherical.theta -= dx * 0.005;
-  spherical.phi = Math.max(0.1, Math.min(Math.PI / 2, spherical.phi - dy * 0.005));
-  mouse.lastX = e.clientX;
-  mouse.lastY = e.clientY;
+canvas.addEventListener('mousedown', e => { dragging = true; lastX = e.clientX; lastY = e.clientY; });
+window.addEventListener('mouseup', () => { dragging = false; });
+window.addEventListener('mousemove', e => {
+  if (dragging) {
+    sph.theta -= (e.clientX - lastX) * 0.006;
+    sph.phi = Math.max(0.15, Math.min(1.55, sph.phi - (e.clientY - lastY) * 0.006));
+    lastX = e.clientX; lastY = e.clientY;
+  } else { checkHover(e.clientX, e.clientY); }
 });
 canvas.addEventListener('wheel', e => {
-  spherical.r = Math.max(8, Math.min(50, spherical.r + e.deltaY * 0.02));
+  sph.r = Math.max(8, Math.min(55, sph.r + e.deltaY * 0.025));
 });
 
 function updateCamera() {
-  if (orbitActive) spherical.theta += 0.003;
-  camera.position.x = spherical.r * Math.sin(spherical.phi) * Math.sin(spherical.theta);
-  camera.position.y = spherical.r * Math.cos(spherical.phi);
-  camera.position.z = spherical.r * Math.sin(spherical.phi) * Math.cos(spherical.theta);
+  if (orbitAuto) sph.theta += 0.004;
+  const sin_p = Math.sin(sph.phi);
+  camera.position.set(
+    sph.r * sin_p * Math.sin(sph.theta),
+    sph.r * Math.cos(sph.phi),
+    sph.r * sin_p * Math.cos(sph.theta)
+  );
   camera.lookAt(0, 0, 0);
 }
 
-// ── Scene objects ─────────────────────────────────────────────────────────────
-const nodeObjects = {}; // name → { mesh, label, position }
-const edgeObjects = [];
-const pathObjects = [];
-let agentSphere = null;
-let agentTrail = null;
-let currentStep = 0;
-let maxStep = 0;
-let playing = false;
-let playInterval = null;
+// ── Scene state ───────────────────────────────────────────────────────────────
+const COLS = { src:0xf97316, test:0x3b82f6, spec:0xa855f7, visited:0x22c55e, bug:0xef4444, agent:0xfbbf24, path:0xfacc15, edge:0x334155 };
+
+let nodeMap = {};   // filename → { mesh, basePos }
+let pathLines = [], edgeLines = [];
+let agentMesh = null;
 let vizData = null;
-let nodePositions = {};
+let curStep = 0, maxStep = 0;
+let playing = false, playTimer = null;
+let frame = 0;
 
-// ── Build scene from data ─────────────────────────────────────────────────────
+// ── Build scene ───────────────────────────────────────────────────────────────
+function clearScene() {
+  Object.values(nodeMap).forEach(o => scene.remove(o.mesh));
+  pathLines.forEach(l => scene.remove(l));
+  edgeLines.forEach(l => scene.remove(l));
+  if (agentMesh) scene.remove(agentMesh);
+  nodeMap = {}; pathLines = []; edgeLines = []; agentMesh = null;
+}
+
 function buildScene(data) {
+  clearScene();
   vizData = data;
-
-  // Clear previous objects
-  Object.values(nodeObjects).forEach(o => scene.remove(o.mesh));
-  edgeObjects.forEach(e => scene.remove(e));
-  pathObjects.forEach(p => scene.remove(p));
-  if (agentSphere) scene.remove(agentSphere);
-  Object.keys(nodeObjects).forEach(k => delete nodeObjects[k]);
-
   const files = data.files || [];
   const n = files.length;
-  if (n === 0) return;
+  if (!n) return;
 
-  // Arrange files in a circular layout on XZ plane
-  files.forEach((file, i) => {
-    const angle = (i / n) * Math.PI * 2;
-    const radius = Math.max(4, n * 0.9);
-    const x = Math.cos(angle) * radius;
-    const z = Math.sin(angle) * radius;
-    const y = 0;
+  // Layout: circle
+  files.forEach((f, i) => {
+    const angle = (i / n) * Math.PI * 2 - Math.PI / 2;
+    const R = Math.max(5, n * 1.0);
+    const x = Math.cos(angle) * R;
+    const z = Math.sin(angle) * R;
+    const pos = new THREE.Vector3(x, 0, z);
 
-    nodePositions[file.name] = new THREE.Vector3(x, y, z);
+    const baseColor = f.is_bug_file ? COLS.bug :
+                      f.type === 'test' ? COLS.test :
+                      f.type === 'spec' ? COLS.spec : COLS.src;
+    const col = new THREE.Color(baseColor);
 
-    // Sphere geometry
-    const geo = new THREE.SphereGeometry(0.6, 16, 16);
-    const color = new THREE.Color(
-      file.is_bug_file ? COLORS.bug :
-      file.type === 'test' ? COLORS.test :
-      file.type === 'spec' ? COLORS.spec : COLORS.src
-    );
+    // Main sphere
+    const geo = new THREE.SphereGeometry(0.55, 20, 20);
     const mat = new THREE.MeshPhongMaterial({
-      color,
-      emissive: color.clone().multiplyScalar(0.3),
-      shininess: 60,
-      transparent: true,
-      opacity: 0.9,
+      color: col, emissive: col.clone().multiplyScalar(0.25),
+      shininess: 70, transparent: true, opacity: 0.85,
     });
     const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.set(x, y, z);
-    mesh.userData = { file };
+    mesh.position.copy(pos);
+    mesh.userData = { file: f, basePos: pos.clone() };
     scene.add(mesh);
 
-    // Glow ring
-    const ringGeo = new THREE.RingGeometry(0.75, 0.85, 32);
-    const ringMat = new THREE.MeshBasicMaterial({
-      color,
-      transparent: true,
-      opacity: 0.25,
-      side: THREE.DoubleSide,
-    });
-    const ring = new THREE.Mesh(ringGeo, ringMat);
+    // Ring halo
+    const rg = new THREE.RingGeometry(0.7, 0.82, 32);
+    const rm = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.2, side: THREE.DoubleSide });
+    const ring = new THREE.Mesh(rg, rm);
     ring.rotation.x = Math.PI / 2;
     mesh.add(ring);
 
-    nodeObjects[file.name] = { mesh, position: nodePositions[file.name], file };
+    nodeMap[f.name] = { mesh, basePos: pos.clone() };
   });
 
-  // Draw dependency edges
+  // Dependency edges
   (data.dependencies || []).forEach(dep => {
-    const fromPos = nodePositions[dep.from];
-    const toPos = nodePositions[dep.to];
-    if (!fromPos || !toPos) return;
-
-    const points = [fromPos.clone(), toPos.clone()];
-    const geo = new THREE.BufferGeometry().setFromPoints(points);
-    const mat = new THREE.LineBasicMaterial({
-      color: COLORS.edge,
-      transparent: true,
-      opacity: 0.4,
-    });
+    const a = nodeMap[dep.from], b = nodeMap[dep.to];
+    if (!a || !b) return;
+    const geo = new THREE.BufferGeometry().setFromPoints([a.basePos.clone(), b.basePos.clone()]);
+    const mat = new THREE.LineBasicMaterial({ color: COLS.edge, transparent: true, opacity: 0.35 });
     const line = new THREE.Line(geo, mat);
     scene.add(line);
-    edgeObjects.push(line);
+    edgeLines.push(line);
   });
 
-  // Agent globe
-  const agentGeo = new THREE.SphereGeometry(0.35, 16, 16);
-  const agentMat = new THREE.MeshPhongMaterial({
-    color: COLORS.agent,
-    emissive: 0xfbbf24,
-    emissiveIntensity: 0.8,
-    shininess: 100,
-  });
-  agentSphere = new THREE.Mesh(agentGeo, agentMat);
-  agentSphere.position.set(0, 3, 0); // Start above origin
-  scene.add(agentSphere);
+  // Agent sphere
+  const ag = new THREE.SphereGeometry(0.32, 14, 14);
+  const am = new THREE.MeshPhongMaterial({ color: COLS.agent, emissive: 0xfbbf24, emissiveIntensity: 0.9, shininess: 120 });
+  agentMesh = new THREE.Mesh(ag, am);
+  agentMesh.position.set(0, 3, 0);
+  scene.add(agentMesh);
 
-  // Update UI
-  document.getElementById('stat-task').textContent = data.task || '—';
-  document.getElementById('stat-variant').textContent = data.variant_id || '—';
-  document.getElementById('stat-steps').textContent = (data.steps || []).length;
-  document.getElementById('stat-strategy').textContent = data.strategy || '—';
-  document.getElementById('stat-failure').textContent = data.failure_type || '—';
+  // Update UI stats
+  document.getElementById('st-task').textContent = data.task || '—';
+  document.getElementById('st-var').textContent = (data.variant_id || '—').slice(0, 12);
+  document.getElementById('st-steps').textContent = (data.steps || []).length;
+  document.getElementById('st-strat').textContent = data.strategy || '—';
   updateScore(data.final_score || 0);
-  updateStepLog(data.steps || [], -1);
 
-  // Setup timeline
   maxStep = (data.steps || []).length;
-  const slider = document.getElementById('timeline-slider');
-  slider.max = maxStep;
-  slider.value = 0;
-  currentStep = 0;
-  updateStepLabel(0, maxStep);
-
+  const sl = document.getElementById('slider');
+  sl.max = maxStep; sl.value = 0;
+  curStep = 0;
+  updateLabel(0, maxStep);
   applyStep(0);
 }
 
-// ── Animation: go to a specific step ─────────────────────────────────────────
-function applyStep(stepIndex) {
+// ── Apply step ────────────────────────────────────────────────────────────────
+function applyStep(idx) {
   if (!vizData) return;
   const steps = vizData.steps || [];
-  const visitedFiles = new Set();
-  const modifiedFiles = new Set();
 
   // Reset all nodes
-  Object.values(nodeObjects).forEach(obj => {
-    const file = obj.file;
-    const baseColor = new THREE.Color(
-      file.is_bug_file ? COLORS.bug :
-      file.type === 'test' ? COLORS.test :
-      file.type === 'spec' ? COLORS.spec : COLORS.src
-    );
-    obj.mesh.material.color.set(baseColor);
-    obj.mesh.material.emissive.set(baseColor.clone().multiplyScalar(0.2));
-    obj.mesh.material.opacity = 0.5;
-    obj.mesh.scale.set(1, 1, 1);
+  Object.values(nodeMap).forEach(({ mesh, basePos: _ }) => {
+    const f = mesh.userData.file;
+    const bc = f.is_bug_file ? COLS.bug : f.type === 'test' ? COLS.test : f.type === 'spec' ? COLS.spec : COLS.src;
+    mesh.material.color.set(bc);
+    mesh.material.emissive.set(new THREE.Color(bc).multiplyScalar(0.2));
+    mesh.material.opacity = 0.55;
+    mesh.scale.setScalar(1);
   });
 
   // Remove old path lines
-  pathObjects.forEach(p => scene.remove(p));
-  pathObjects.length = 0;
+  pathLines.forEach(l => scene.remove(l));
+  pathLines = [];
 
-  // Collect positions for path up to current step
-  const pathPositions = [];
+  // Collect positions for path
+  const pathPts = [];
+  const visited = new Set(), modified = new Set();
 
-  for (let i = 0; i < stepIndex; i++) {
-    const step = steps[i];
-    if (!step) continue;
-
-    if (step.path && nodeObjects[step.path]) {
-      const pos = nodeObjects[step.path].position.clone();
-      pathPositions.push(pos.clone().add(new THREE.Vector3(0, 0.1, 0)));
-
-      if (step.action === 'read_file') visitedFiles.add(step.path);
-      if (step.action === 'write_file') modifiedFiles.add(step.path);
+  for (let i = 0; i < idx; i++) {
+    const s = steps[i];
+    if (!s) continue;
+    if (s.path && nodeMap[s.path]) {
+      const p = nodeMap[s.path].basePos.clone().add(new THREE.Vector3(0, 0.15, 0));
+      pathPts.push(p);
     }
+    if (s.action === 'read_file' && s.path) visited.add(s.path);
+    if (s.action === 'write_file' && s.path) modified.add(s.path);
   }
 
-  // Color visited + modified
-  visitedFiles.forEach(name => {
-    if (nodeObjects[name]) {
-      nodeObjects[name].mesh.material.color.set(COLORS.visited);
-      nodeObjects[name].mesh.material.emissive.set(
-        new THREE.Color(COLORS.visited).multiplyScalar(0.4)
-      );
-      nodeObjects[name].mesh.material.opacity = 1.0;
-      nodeObjects[name].mesh.scale.set(1.2, 1.2, 1.2);
+  // Color visited/modified
+  visited.forEach(name => {
+    if (nodeMap[name]) {
+      nodeMap[name].mesh.material.color.set(COLS.visited);
+      nodeMap[name].mesh.material.emissive.set(new THREE.Color(COLS.visited).multiplyScalar(0.4));
+      nodeMap[name].mesh.material.opacity = 1;
+      nodeMap[name].mesh.scale.setScalar(1.25);
     }
   });
-  modifiedFiles.forEach(name => {
-    if (nodeObjects[name]) {
-      nodeObjects[name].mesh.material.color.set(COLORS.modified);
-      nodeObjects[name].mesh.material.emissive.set(
-        new THREE.Color(COLORS.modified).multiplyScalar(0.5)
-      );
-      nodeObjects[name].mesh.material.opacity = 1.0;
-      nodeObjects[name].mesh.scale.set(1.4, 1.4, 1.4);
+  modified.forEach(name => {
+    if (nodeMap[name]) {
+      nodeMap[name].mesh.material.color.set(COLS.bug);
+      nodeMap[name].mesh.material.emissive.set(new THREE.Color(COLS.bug).multiplyScalar(0.5));
+      nodeMap[name].mesh.material.opacity = 1;
+      nodeMap[name].mesh.scale.setScalar(1.45);
     }
   });
-
-  // Draw path beam
-  if (pathPositions.length >= 2) {
-    const pathGeo = new THREE.BufferGeometry().setFromPoints(pathPositions);
-    const pathMat = new THREE.LineBasicMaterial({
-      color: COLORS.path,
-      transparent: true,
-      opacity: 0.85,
-      linewidth: 2,
-    });
-    const pathLine = new THREE.Line(pathGeo, pathMat);
-    scene.add(pathLine);
-    pathObjects.push(pathLine);
-  }
-
-  // Move agent sphere
-  if (stepIndex > 0 && stepIndex <= steps.length) {
-    const currentStepData = steps[stepIndex - 1];
-    if (currentStepData && currentStepData.path && nodeObjects[currentStepData.path]) {
-      const targetPos = nodeObjects[currentStepData.path].position;
-      agentSphere.position.set(targetPos.x, targetPos.y + 1.2, targetPos.z);
-    } else {
-      // No file target — float in center (for search/submit actions)
-      agentSphere.position.set(0, 2.5, 0);
-    }
-  } else {
-    agentSphere.position.set(0, 3.5, 0);
-  }
 
   // Highlight current node
-  if (stepIndex > 0) {
-    const cur = steps[stepIndex - 1];
-    if (cur && cur.path && nodeObjects[cur.path]) {
-      nodeObjects[cur.path].mesh.scale.set(1.6, 1.6, 1.6);
+  if (idx > 0 && idx <= steps.length) {
+    const cur = steps[idx - 1];
+    if (cur && cur.path && nodeMap[cur.path]) {
+      nodeMap[cur.path].mesh.scale.setScalar(1.65);
     }
   }
 
-  updateStepLog(steps, stepIndex - 1);
-  updateStepLabel(stepIndex, maxStep);
+  // Draw path
+  if (pathPts.length >= 2) {
+    const geo = new THREE.BufferGeometry().setFromPoints(pathPts);
+    const mat = new THREE.LineBasicMaterial({ color: COLS.path, transparent: true, opacity: 0.9 });
+    const line = new THREE.Line(geo, mat);
+    scene.add(line); pathLines.push(line);
+  }
 
-  // Update slider gradient
-  const slider = document.getElementById('timeline-slider');
-  const pct = maxStep > 0 ? (stepIndex / maxStep * 100) : 0;
-  slider.style.setProperty('--pct', pct + '%');
+  // Move agent
+  if (idx > 0 && idx <= steps.length) {
+    const cur = steps[idx - 1];
+    if (cur && cur.path && nodeMap[cur.path]) {
+      const tp = nodeMap[cur.path].basePos;
+      agentMesh.position.set(tp.x, tp.y + 1.3, tp.z);
+    } else {
+      agentMesh.position.set(0, 2.5, 0);
+    }
+  } else {
+    agentMesh.position.set(0, 3.5, 0);
+  }
+
+  updateLog(steps, idx - 1);
+  updateLabel(idx, maxStep);
+  const sl = document.getElementById('slider');
+  sl.style.setProperty('--pct', (maxStep > 0 ? idx / maxStep * 100 : 0) + '%');
 }
 
-// ── Score ring ────────────────────────────────────────────────────────────────
-function updateScore(score) {
-  const circumference = 2 * Math.PI * 34;
-  const arc = circumference * Math.min(1, Math.max(0, score));
-  document.getElementById('score-arc').setAttribute(
-    'stroke-dasharray', `${arc} ${circumference}`
-  );
-  document.getElementById('score-text').textContent = score.toFixed(2);
-  document.getElementById('stat-score').textContent = score.toFixed(3);
-
-  // Color by score
-  const color = score >= 0.7 ? '#4ade80' : score >= 0.4 ? '#fbbf24' : '#f87171';
-  document.getElementById('score-arc').setAttribute('stroke', color);
+// ── Score ring ─────────────────────────────────────────────────────────────────
+function updateScore(s) {
+  const c = 2 * Math.PI * 30;
+  const arc = c * Math.min(1, Math.max(0, s));
+  document.getElementById('score-arc').setAttribute('stroke-dasharray', `${arc} ${c}`);
+  document.getElementById('score-txt').textContent = s.toFixed(2);
+  document.getElementById('st-score').textContent = s.toFixed(3);
+  const col = s >= 0.7 ? '#4ade80' : s >= 0.4 ? '#fbbf24' : '#f87171';
+  document.getElementById('score-arc').setAttribute('stroke', col);
 }
 
-// ── Step log ──────────────────────────────────────────────────────────────────
-function updateStepLog(steps, currentIdx) {
-  const container = document.getElementById('log-entries');
+// ── Step log ───────────────────────────────────────────────────────────────────
+function updateLog(steps, curIdx) {
+  const em = { read_file:'📖', write_file:'✏️', run_tests:'🧪', search_code:'🔍', submit:'🏁' };
+  const container = document.getElementById('log-list');
   container.innerHTML = '';
-
-  const ACTION_EMOJI = {
-    read_file: '📖',
-    write_file: '✏️',
-    run_tests: '🧪',
-    search_code: '🔍',
-    submit: '🏁',
-  };
-
-  steps.forEach((step, i) => {
-    const active = i === currentIdx;
-    const past = i < currentIdx;
-    const entry = document.createElement('div');
-    entry.className = 'log-entry';
-    entry.style.opacity = past ? '0.6' : active ? '1' : '0.35';
-    if (active) entry.style.background = 'rgba(125,211,252,0.08)';
-
-    const reward = step.reward || 0;
-    const rewardClass = reward > 0 ? 'reward-pos' : reward < 0 ? 'reward-neg' : 'reward-zero';
-    const emoji = ACTION_EMOJI[step.action] || '•';
-    const path = step.path ? step.path.split('/').pop() : step.action;
-
-    entry.innerHTML = `
-      <span class="log-step">S${step.step}</span>
-      <span class="log-action" style="color:${active ? '#7dd3fc' : '#94a3b8'}">${emoji} ${path}</span>
-      <span class="log-reward ${rewardClass}">${reward > 0 ? '+' : ''}${reward.toFixed(2)}</span>
-    `;
-    container.appendChild(entry);
+  steps.forEach((s, i) => {
+    const e = document.createElement('div');
+    e.className = 'log-e';
+    e.style.opacity = i < curIdx ? '0.55' : i === curIdx ? '1' : '0.3';
+    if (i === curIdx) e.style.background = 'rgba(125,211,252,0.07)';
+    const r = s.reward || 0;
+    const rc = r > 0 ? 'rp' : r < 0 ? 'rn' : 'rz';
+    const name = (s.path || s.action || '').split('/').pop() || s.action;
+    e.innerHTML = `<span class="log-s">S${s.step}</span><span class="log-a">${em[s.action]||'•'} ${name}</span><span class="${rc}">${r>0?'+':''}${r.toFixed(2)}</span>`;
+    container.appendChild(e);
   });
-
-  // Auto-scroll to current
-  if (currentIdx >= 0) {
-    const entries = container.children;
-    if (entries[currentIdx]) {
-      entries[currentIdx].scrollIntoView({ block: 'nearest' });
-    }
+  if (curIdx >= 0 && container.children[curIdx]) {
+    container.children[curIdx].scrollIntoView({ block: 'nearest' });
   }
 }
 
-// ── Hover tooltip ─────────────────────────────────────────────────────────────
-const raycaster = new THREE.Raycaster();
-const mouseVec = new THREE.Vector2();
-const tooltip = document.getElementById('tooltip');
+// ── Hover tooltip ──────────────────────────────────────────────────────────────
+const ray = new THREE.Raycaster();
+const mv = new THREE.Vector2();
+const tt = document.getElementById('tooltip');
 
 function checkHover(mx, my) {
-  mouseVec.x = (mx / window.innerWidth) * 2 - 1;
-  mouseVec.y = -(my / window.innerHeight) * 2 + 1;
-  raycaster.setFromCamera(mouseVec, camera);
-
-  const meshes = Object.values(nodeObjects).map(o => o.mesh);
-  const hits = raycaster.intersectObjects(meshes);
-
-  if (hits.length > 0) {
-    const file = hits[0].object.userData.file;
-    if (file) {
-      tooltip.style.opacity = '1';
-      tooltip.style.left = (mx + 14) + 'px';
-      tooltip.style.top = (my - 14) + 'px';
-      document.getElementById('tooltip-title').textContent = file.name;
-      document.getElementById('tooltip-body').innerHTML = `
-        Type: ${file.type}<br>
-        ${file.is_bug_file ? '⚠️ Bug location' : ''}
-      `;
-    }
+  mv.x = (mx / window.innerWidth) * 2 - 1;
+  mv.y = -(my / window.innerHeight) * 2 + 1;
+  ray.setFromCamera(mv, camera);
+  const meshes = Object.values(nodeMap).map(o => o.mesh);
+  const hits = ray.intersectObjects(meshes);
+  if (hits.length) {
+    const f = hits[0].object.userData.file;
+    tt.style.opacity = '1';
+    tt.style.left = (mx + 12) + 'px';
+    tt.style.top = (my - 8) + 'px';
+    document.getElementById('tt-title').textContent = f.name;
+    document.getElementById('tt-body').innerHTML =
+      `Type: ${f.type}${f.is_bug_file ? '<br>⚠️ Bug location' : ''}${f.visited ? '<br>✅ Visited' : ''}`;
   } else {
-    tooltip.style.opacity = '0';
+    tt.style.opacity = '0';
   }
 }
 
-// ── Timeline controls ─────────────────────────────────────────────────────────
-function onSliderChange(val) {
-  currentStep = parseInt(val);
-  applyStep(currentStep);
-}
-
-function stepForward() {
-  if (currentStep < maxStep) {
-    currentStep++;
-    document.getElementById('timeline-slider').value = currentStep;
-    applyStep(currentStep);
-  }
-}
-
-function stepBack() {
-  if (currentStep > 0) {
-    currentStep--;
-    document.getElementById('timeline-slider').value = currentStep;
-    applyStep(currentStep);
-  }
-}
-
+// ── Controls ───────────────────────────────────────────────────────────────────
+function onSlider(v) { curStep = +v; applyStep(curStep); }
+function stepFwd() { if (curStep < maxStep) { curStep++; document.getElementById('slider').value = curStep; applyStep(curStep); } }
+function stepBack() { if (curStep > 0) { curStep--; document.getElementById('slider').value = curStep; applyStep(curStep); } }
 function togglePlay() {
   playing = !playing;
-  const btn = document.getElementById('play-btn');
-  btn.textContent = playing ? '⏸ Pause' : '▶ Play';
+  document.getElementById('play-btn').textContent = playing ? '⏸ Pause' : '▶ Play';
   if (playing) {
-    if (currentStep >= maxStep) { currentStep = 0; }
-    playInterval = setInterval(() => {
-      if (currentStep >= maxStep) {
-        playing = false;
-        btn.textContent = '▶ Play';
-        clearInterval(playInterval);
-        return;
-      }
-      stepForward();
-    }, 900);
+    if (curStep >= maxStep) curStep = 0;
+    playTimer = setInterval(() => {
+      if (curStep >= maxStep) { playing = false; document.getElementById('play-btn').textContent = '▶ Play'; clearInterval(playTimer); return; }
+      stepFwd();
+    }, 850);
   } else {
-    clearInterval(playInterval);
+    clearInterval(playTimer);
   }
 }
-
 function toggleOrbit() {
-  orbitActive = !orbitActive;
+  orbitAuto = !orbitAuto;
   const btn = document.getElementById('orbit-btn');
-  btn.textContent = orbitActive ? '⏹ Stop' : '🔄 Orbit';
-  btn.classList.toggle('active', orbitActive);
+  btn.textContent = orbitAuto ? '⏹ Stop' : '🔄 Orbit';
+  btn.classList.toggle('active', orbitAuto);
 }
-
 function resetView() {
-  spherical = { theta: 0, phi: Math.PI / 4, r: 22 };
-  currentStep = 0;
-  document.getElementById('timeline-slider').value = 0;
+  sph = { theta: 0, phi: 1.1, r: 24 };
+  curStep = 0;
+  document.getElementById('slider').value = 0;
   applyStep(0);
 }
+function updateLabel(s, m) { document.getElementById('step-label').textContent = `Step ${s} / ${m}`; }
 
-function updateStepLabel(step, max) {
-  document.getElementById('step-label').textContent = `Step ${step} / ${max}`;
-}
-
-// ── Animation loop ────────────────────────────────────────────────────────────
-let frame = 0;
+// ── Animation loop ─────────────────────────────────────────────────────────────
 function animate() {
   requestAnimationFrame(animate);
   frame++;
-
   updateCamera();
-
-  // Pulse agent sphere
-  if (agentSphere) {
-    const pulse = 1 + Math.sin(frame * 0.08) * 0.15;
-    agentSphere.scale.set(pulse, pulse, pulse);
-    agentSphere.rotation.y += 0.03;
+  // Pulsing agent
+  if (agentMesh) {
+    const p = 1 + Math.sin(frame * 0.09) * 0.18;
+    agentMesh.scale.setScalar(p);
+    agentMesh.rotation.y += 0.04;
   }
-
-  // Subtle node oscillation
-  Object.values(nodeObjects).forEach((obj, i) => {
-    obj.mesh.position.y = obj.position.y + Math.sin(frame * 0.02 + i) * 0.05;
+  // Subtle node float
+  Object.values(nodeMap).forEach(({ mesh, basePos }, i) => {
+    mesh.position.y = basePos.y + Math.sin(frame * 0.018 + i * 1.1) * 0.07;
   });
-
   renderer.render(scene, camera);
 }
+animate();
 
-// ── Window resize ─────────────────────────────────────────────────────────────
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-});
-
-// ── Public API for Gradio integration ────────────────────────────────────────
-window.loadTrajectoryData = function(jsonData) {
+// ── Load data from API ─────────────────────────────────────────────────────────
+async function fetchAndLoad() {
+  document.getElementById('loader').style.display = 'block';
+  document.getElementById('no-data').style.display = 'none';
   try {
-    const data = typeof jsonData === 'string' ? JSON.parse(jsonData) : jsonData;
+    // Try to determine base URL from window location
+    const base = window.location.origin;
+    const res = await fetch(`${base}/viz-data`, { cache: 'no-store' });
+    if (!res.ok) throw new Error('no data');
+    const data = await res.json();
+    if (data.error || !data.files || data.files.length === 0) {
+      document.getElementById('loader').style.display = 'none';
+      document.getElementById('no-data').style.display = 'block';
+      return;
+    }
     buildScene(data);
+    document.getElementById('loader').style.display = 'none';
   } catch(e) {
-    console.error('Failed to load trajectory data:', e);
+    document.getElementById('loader').style.display = 'none';
+    document.getElementById('no-data').style.display = 'block';
   }
-};
+}
 
-// ── Init ─────────────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-  const data = loadVizData();
+// ── Public API (can be called from parent window) ─────────────────────────────
+window.loadData = function(data) {
+  if (typeof data === 'string') { try { data = JSON.parse(data); } catch(e) { return; } }
   buildScene(data);
   document.getElementById('loader').style.display = 'none';
-  animate();
-});
+  document.getElementById('no-data').style.display = 'none';
+};
+
+// Auto-load on init
+window.addEventListener('load', fetchAndLoad);
 </script>
 </body>
 </html>

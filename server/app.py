@@ -1,12 +1,14 @@
 # server/app.py
 """
-FastAPI server — v3.0
+FastAPI server — v4.0
 
 Core endpoints:        POST /reset, POST /step, GET /state, GET /health
 Evaluation endpoints:  GET /trajectory, GET /evaluate, GET /metrics
 Control endpoints:     POST /fault-config
-Intelligence endpoints: GET /classify, GET /strategy, GET /advanced-metrics,
-                        POST /compare-agents, GET /improvement-plan, GET /viz-data
+Intelligence (v3):     GET /classify, GET /strategy, GET /advanced-metrics,
+                       POST /compare-agents, GET /improvement-plan, GET /viz-data
+Research (v4 NEW):     GET /causal-probe, GET /counterfactual, GET /confidence,
+                       POST /benchmark, GET /analytics
 """
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
@@ -336,4 +338,147 @@ async def get_viz_data():
         "files": files,
         "dependencies": deps,
         "steps": steps_data,
+    }
+
+
+# ── Research Endpoints (NEW in v4) ────────────────────────────────────────────
+
+from .causal_probe import CausalProbe
+from .counterfactual_engine import CounterfactualEngine
+from .confidence_calibrator import ConfidenceCalibrator
+from .benchmark_runner import BenchmarkRunner
+from .analytics_engine import AnalyticsEngine
+
+_causal = CausalProbe()
+_counter = CounterfactualEngine()
+_calibrator = ConfidenceCalibrator()
+_benchmark = BenchmarkRunner()
+_analytics = AnalyticsEngine()
+
+
+@app.get("/causal-probe")
+async def causal_probe():
+    """
+    Causal reasoning probe — did the agent understand WHY the bug exists?
+    Returns: causal_score, understanding_level, chain_coverage, shortcut_detection.
+    """
+    traj = env.get_trajectory()
+    if not traj:
+        return {"error": "No trajectory available."}
+    steps = traj.get("steps", [])
+    meta = env.variant.meta if env.variant else {}
+    report = _causal.probe(
+        episode_id=traj.get("episode_id", ""),
+        task=env.current_task or "unknown",
+        trajectory_steps=steps,
+        variant_meta=meta,
+        files_read=list(env.files_read),
+        files_written=list(env.files_written),
+        final_score=env.final_score,
+    )
+    return report.to_dict()
+
+
+@app.get("/counterfactual")
+async def counterfactual():
+    """
+    Counterfactual robustness test — is the agent's strategy brittle?
+    Simulates 6 mutations and measures how many the strategy survives.
+    Returns: robustness_score, brittleness_level, mutations analysis.
+    """
+    traj = env.get_trajectory()
+    if not traj:
+        return {"error": "No trajectory available."}
+    steps = traj.get("steps", [])
+    meta = env.variant.meta if env.variant else {}
+    report = _counter.analyze(
+        episode_id=traj.get("episode_id", ""),
+        task=env.current_task or "unknown",
+        trajectory_steps=steps,
+        variant_meta=meta,
+        files_read=list(env.files_read),
+        files_written=list(env.files_written),
+        final_score=env.final_score,
+    )
+    return report.to_dict()
+
+
+@app.get("/confidence")
+async def confidence_calibration():
+    """
+    Confidence calibration — is the agent appropriately confident?
+    Infers confidence from behavioral proxies and compares to actual performance.
+    Returns: profile (WELL_CALIBRATED|OVERCONFIDENT|UNDERCONFIDENT), calibration_score.
+    """
+    traj = env.get_trajectory()
+    if not traj:
+        return {"error": "No trajectory available."}
+    steps = traj.get("steps", [])
+    report = _calibrator.calibrate(
+        episode_id=traj.get("episode_id", ""),
+        task=env.current_task or "unknown",
+        trajectory_steps=steps,
+        final_score=env.final_score,
+    )
+    return report.to_dict()
+
+
+@app.post("/benchmark")
+async def run_benchmark(
+    tasks: str = "task1,task2",
+    agents: str = "all",
+    benchmark_id: str = None,
+):
+    """
+    Automated benchmark leaderboard.
+    Runs all selected agents × tasks. Returns ranked leaderboard.
+    tasks: comma-separated task IDs. agents: "all" or comma-separated strategy names.
+    """
+    task_list = [t.strip() for t in tasks.split(",") if t.strip()]
+    valid_tasks = ["task1", "task2", "task3"]
+    task_list = [t for t in task_list if t in valid_tasks]
+    if not task_list:
+        raise HTTPException(status_code=400, detail=f"tasks must be one of {valid_tasks}")
+
+    agent_list = None if agents == "all" else [a.strip() for a in agents.split(",")]
+
+    try:
+        report = _benchmark.run(env, tasks=task_list, agents=agent_list, benchmark_id=benchmark_id)
+        return report.to_dict()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/analytics")
+async def get_analytics():
+    """
+    Unified research-grade analytics report.
+    Synthesizes all v3+v4 evaluation dimensions into one report with:
+    reasoning graph, root cause tree, alternative paths, profile tags,
+    composite score, executive summary, researcher notes.
+    """
+    traj = env.get_trajectory()
+    if not traj:
+        return {"error": "No trajectory available."}
+    try:
+        report = _analytics.analyze(env)
+        return report.to_dict()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/health")
+async def health_v4():
+    return {
+        "status": "ok",
+        "environment": "codebase-nav-env",
+        "version": "4.0.0",
+        "endpoints": [
+            "/reset", "/step", "/state", "/health",
+            "/trajectory", "/evaluate", "/metrics", "/fault-config",
+            "/classify", "/strategy", "/advanced-metrics",
+            "/improvement-plan", "/compare-agents", "/viz-data",
+            "/causal-probe", "/counterfactual", "/confidence",
+            "/benchmark", "/analytics",
+        ],
     }
