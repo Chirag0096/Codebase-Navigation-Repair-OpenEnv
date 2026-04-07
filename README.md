@@ -35,7 +35,7 @@ By tracking structural behavior instead of just outcomes, our platform gives res
 
 ### 🎬 See It In Action (Demo)
 
-![3D Visualizer Architecture Trace](https://raw.githubusercontent.com/Chirag0096/Codebase-Navigation-Repair-OpenEnv/assets/assets/demo.png)
+![3D Visualizer Architecture Trace](https://raw.githubusercontent.com/Chirag0096/Codebase-Navigation-Repair-OpenEnv/assets/assets/demo.webp)
 
 *(A live recording of the 3D agent visualizer tracking test files, source files, and resolving dependencies)*
 
