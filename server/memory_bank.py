@@ -286,8 +286,20 @@ class EpisodicMemoryBank:
     # ── Persistence ───────────────────────────────────────────────────────────
 
     def _save(self):
-        with open(self.persist_path, "w") as f:
-            json.dump([e.to_dict() for e in self._entries], f, indent=2)
+        tpath = getattr(self, "persist_path", None)
+        if not tpath:
+            return
+        try:
+            with open(tpath, "w") as f:
+                json.dump([e.to_dict() for e in self._entries], f, indent=2)
+        except PermissionError:
+            import tempfile
+            fallback = os.path.join(tempfile.gettempdir(), "agent_memory.json")
+            if self.persist_path != fallback:
+                self.persist_path = fallback
+                self._save()
+        except Exception as e:
+            print(f"[MemoryBank] Warning: Failed to save to {self.persist_path}: {e}")
 
     def _load(self):
         try:
