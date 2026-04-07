@@ -539,6 +539,39 @@ with gr.Blocks(title="Codebase Navigation & Repair — OpenEnv v4") as demo:
 
     with gr.Tabs():
 
+        # ── Tab 0: Quick Start Guide ──────────────────────────────────────────
+        with gr.TabItem("📖 Quick Start Guide"):
+            gr.Markdown("""
+### Welcome to Codebase Navigation & Repair — OpenEnv v4
+
+This interactive dashboard allows you to experience the environment infrastructure, run simulations, and analyze advanced agent logic.
+
+#### 🚀 Step-by-Step Evaluation Guide:
+
+1. **Initialize an Episode** 
+   - Navigate to the **🤖 Run Agent** tab.
+   - Select a task (`task1`, `task2`, or `task3`) and click **"Run Agent"**.
+   - *This simulates an AI executing an episode dynamically against the environment and stores the trajectory.*
+
+2. **Trigger Advanced Intelligence Diagnostics (v3/v4 Features)**
+   - Go to **🧪 Causal Probe** and click it to evaluate if the agent truly understood the bug, or if it was just pattern-matching.
+   - Go to **🎭 Counterfactual** to run mutation tests and analyze the brittleness of the agent's logic.
+   - Go to **📐 Confidence** to see if the agent over-explored or submitted too early.
+   - Go to **🧠 Intelligence** to execute failure classification and strategy detection.
+
+3. **Visualize the Thought Process**
+   - Head over to the **🌐 3D Visualizer** tab.
+   - Click **"Load / Refresh Visualizer"**.
+   - Using Three.js, this generates a dynamic 3D web of exactly how the agent traversed the repository files (cubes) and tests (prisms).
+
+4. **Experiment Manually**
+   - Want to play the game yourself? Go to the **🎮 Interactive** tab.
+   - Click **Reset Environment**, then use the dropdowns to `read_file`, `write_file`, and finally `submit` to grade yourself.
+
+5. **REST API / CLI Runner**
+   - The entire platform operates out of incredibly fast, natively compliant REST endpoints. Check the **📖 API** tab for standard cURL routing.
+            """)
+
         # ── Tab 1: Interactive ────────────────────────────────────────────────
         with gr.TabItem("🎮 Interactive"):
             with gr.Row():
