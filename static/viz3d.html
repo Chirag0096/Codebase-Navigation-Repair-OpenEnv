@@ -269,6 +269,7 @@ scene.add(grid);
 // ── Orbit controls (manual) ───────────────────────────────────────────────────
 let sph = { theta: 0, phi: 1.1, r: 24 };
 let orbitAuto = false, dragging = false, lastX = 0, lastY = 0;
+let lookTarget = new THREE.Vector3(0,0,0);
 
 canvas.addEventListener('mousedown', e => { dragging = true; lastX = e.clientX; lastY = e.clientY; });
 window.addEventListener('mouseup', () => { dragging = false; });
@@ -287,11 +288,11 @@ function updateCamera() {
   if (orbitAuto) sph.theta += 0.004;
   const sin_p = Math.sin(sph.phi);
   camera.position.set(
-    sph.r * sin_p * Math.sin(sph.theta),
-    sph.r * Math.cos(sph.phi),
-    sph.r * sin_p * Math.cos(sph.theta)
+    sph.r * sin_p * Math.sin(sph.theta) + lookTarget.x,
+    sph.r * Math.cos(sph.phi) + (lookTarget.y * 0.3),
+    sph.r * sin_p * Math.cos(sph.theta) + lookTarget.z
   );
-  camera.lookAt(0, 0, 0);
+  camera.lookAt(lookTarget);
 }
 
 // ── Scene state ───────────────────────────────────────────────────────────────
@@ -338,14 +339,19 @@ function buildScene(data) {
                       f.type === 'spec' ? COLS.spec : COLS.src;
     const col = new THREE.Color(baseColor);
 
-    // Main sphere
-    const geo = new THREE.SphereGeometry(0.55, 20, 20);
+    // Diverse Geometries
+    let geo;
+    if (f.type === 'test') { geo = new THREE.CylinderGeometry(0.5, 0.5, 0.8, 6); } // Hex prism
+    else if (f.type === 'spec') { geo = new THREE.OctahedronGeometry(0.65); }      // Diamond
+    else { geo = new THREE.BoxGeometry(0.85, 0.85, 0.85); }                        // Code block Cube
+
     const mat = new THREE.MeshPhongMaterial({
       color: col, emissive: col.clone().multiplyScalar(0.25),
-      shininess: 70, transparent: true, opacity: 0.85,
+      shininess: 90, transparent: true, opacity: 0.85, flatShading: true
     });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.copy(pos);
+    if (f.type !== 'src') { mesh.rotation.x = 0.2; mesh.rotation.z = Math.random() * 0.5; }
     mesh.userData = { file: f, basePos: pos.clone() };
     scene.add(mesh);
 
@@ -458,11 +464,16 @@ function applyStep(idx) {
     }
   }
 
-  // Draw path
+  // Draw precision tube path
   if (pathPts.length >= 2) {
-    const geo = new THREE.BufferGeometry().setFromPoints(pathPts);
-    const mat = new THREE.LineBasicMaterial({ color: COLS.path, transparent: true, opacity: 0.9 });
-    const line = new THREE.Line(geo, mat);
+    // Add an exact curve mapping
+    const curve = new THREE.CatmullRomCurve3(pathPts);
+    const geo = new THREE.TubeGeometry(curve, pathPts.length * 8, 0.045, 8, false);
+    const mat = new THREE.MeshPhongMaterial({ 
+      color: COLS.path, emissive: COLS.path, emissiveIntensity: 0.6, 
+      transparent: true, opacity: 0.8 
+    });
+    const line = new THREE.Mesh(geo, mat);
     scene.add(line); pathLines.push(line);
   }
 
@@ -576,7 +587,11 @@ function updateLabel(s, m) { document.getElementById('step-label').textContent =
 function animate() {
   requestAnimationFrame(animate);
   frame++;
+  
+  // Dynamic camera focal tracking
+  lookTarget.lerp(targetAgentPos, 0.03);
   updateCamera();
+
   // Pulsing & moving agent (seamless flow)
   if (agentMesh) {
     agentMesh.position.lerp(targetAgentPos, 0.08); // Smooth transition
