@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "codebase-nav-env"
+version = "4.0.0"
+description = "Codebase Navigation Repair OpenEnv: An AI reliability and navigation platform."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+  {name = "Chirag Aswal"}
+]
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic",
+    "openai",
+    "httpx",
+    "pytest",
+    "gradio>=4.0",
+    "huggingface_hub"
+]
+
+[project.urls]
+Homepage = "https://huggingface.co/spaces/Chirag0123/codebase-nav-env"
+Repository = "https://github.com/Chirag0096/Codebase-Navigation-Repair-OpenEnv.git"
+
+[tool.setuptools.packages.find]
+include = ["*"]
+exclude = ["repo_templates*"]
