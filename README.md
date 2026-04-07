@@ -13,161 +13,82 @@ tags:
   - coding-agent
 ---
 
-# 🔍 Codebase Navigation & Repair — OpenEnv
+# 🔍 The Antidote to "Vibe Coding" — AI Reliability & Navigation Platform 
 
-> **The system that makes AI coding agents reliable, testable, and debuggable.**
+> **The system repairing the era of blind AI coding by making agents structural, testable, and deeply debuggable.**
 
-## The Problem
+**Play with the live environment:** [Interactive Hugging Face Space](https://huggingface.co/spaces/Chirag0123/codebase-nav-env)
 
-AI coding agents (Copilot, Devin, Cursor) fail ~25%+ on complex tasks. Current benchmarks tell you the score but not **why** the agent failed. Was it poor navigation? Wasted steps? Hallucinated code? There is no way to know.
+## 🚨 The End of "Vibe Coding"
 
-## Our Solution
+We are officially in the era of **Vibe Coding**. The amount of AI-generated code is exploding, yet developers and AI Agents (Copilot, Devin, Claude Code) are increasingly writing and submitting code *blindly*. 
 
-An RL environment where agents navigate unfamiliar Python repos, find bugs, and fix them — graded by **actual pytest execution** with **process-level evaluation**.
+Most agents don't actually know **where the issue exists**, what the **code flow** looks like, or how the **function dependencies** cascade. They simply guess edits based on the prompt until a test arbitrarily passes. When an AI agent claims "I fixed the bug," how do you verify *how* it did it? Did it actually navigate to the source of the crash, or did it randomly change syntax until the test turned green? 
 
-Unlike existing benchmarks, we evaluate **how** the agent works, not just the final output:
+Current benchmarks only evaluate the final outcome. **They don't evaluate cognition.**
 
-| What We Measure | Why It Matters |
-|----------------|---------------|
-| Navigation efficiency | Did it read relevant files first? |
-| Reasoning patterns | Did it follow read→write→test? |
-| Context usage | How much of what it read was useful? |
-| Security | Did it write safe code? |
-| Robustness | Can it handle misleading comments? |
+## 💡 The Solution: 3D Visualization & Deep Analytic Execution
 
-## How It Works
+This project is not just an environment benchmark—it is a **diagnostic platform**. It forces autonomous AI agents to explore an unknown Python repository file-by-file, and then exposes their **exact cognitive flow** using our bespoke state-of-the-art **3D Visualizer**. 
 
-```
-Agent resets environment → sees repo file tree (NOT contents)
-  → reads files one at a time (costs steps)
-  → identifies bugs in source code
-  → writes fixed code
-  → runs tests to verify
-  → submits for final grade
-```
+By tracking structural behavior instead of just outcomes, our platform gives researchers and operators complete visibility into the AI's actual thought processes and navigation flow.
 
-### Tasks
+### 🎬 See It In Action (Demo)
 
-| Task | Difficulty | Description | Variants |
-|------|-----------|-------------|----------|
-| task1 | Easy | Single-file bug repair | 5 |
-| task2 | Medium | Cross-module interface bug + regression test | 5 |
-| task3 | Hard | Feature implementation from spec | 5 |
+![3D Visualizer Architecture Trace](assets/demo.webp)
 
-Each variant has structurally different code, so the agent can't memorize solutions.
+*(A live recording of the 3D agent visualizer tracking test files, source files, and resolving dependencies)*
 
-## Quick Start
+## 🧠 Core Intelligence Modules
+
+Unlike existing models, we evaluate **how** the agent works, using several proprietary research-grade engines:
+
+| Module | What It Does (The Antidote to Vibe Coding) |
+|--------|--------------------------------------------|
+| **Causal Graph Probe** | Detects "Shortcut Learning". Did the agent actually read the test file, trace its imported module, and fix the root cause, or did it guess blindly? |
+| **Confidence Calibrator** | Infers agent behavioral confidence based on commit speed, rewrite hesitation, and test verification ratios. |
+| **Counterfactual Engine** | Analyzes the precise trace line to determine if the agent's strategy is brittle and heavily reliant on memorization of specific repository layouts. |
+| **Episodic Memory Bank** | A cross-episode RAG store that captures mistakes (like failing to run tests before commiting) and injects hard lessons into future iteration system prompts. |
+| **3D Trace Visualizer** | A seamless, fully-interpolated 3D environment engine that renders repos as geometric maps (Cubes for Source, Prisms for Tests) and visualizes the exact agent navigation traces with glowing Catmull-Rom tube curves. |
+
+## ⚙️ How It Works (The OpenEnv Standard)
+
+1. **Agent loads unfamiliar environment** → sees repo file tree (NOT contents).
+2. Agent reads files one at a time (costs strict exploration steps).
+3. Agent identifies structural vulnerabilities via function-flow analysis.
+4. Agent writes fixed code.
+5. Agent verifies functionality through containerized `pytest` execution. 
+6. Environment scores agent completely dynamically across 6 separate research axes.
+
+## 🚀 Quick Start
 
 ### 1. Run Locally (No Docker)
 ```bash
 pip install -r requirements.txt
-python app.py                    # Gradio UI at http://localhost:7860
+python app.py                    # Gradio UI + FastAPI at http://localhost:7860
 ```
 
-### 2. Run Agent (No LLM needed)
-```bash
-python run_agent.py              # deterministic agent demo
-python run_agent.py --all-tasks  # run all 3 tasks
-```
-
-### 3. Run Agent with LLM
+### 2. Connect Your Custom LLM Agent
 ```bash
 export HF_TOKEN=hf_xxxxx
-python run_agent.py --llm --task task1
+# Configure your script to hit the local /step FASTApi environment
+python inference.py
 ```
 
-### 4. Docker
+### 3. Deploy via Docker
 ```bash
 docker build -t codebase-nav-env .
 docker run -p 7860:7860 codebase-nav-env
 ```
 
-### 5. API Usage
-```bash
-# Reset
-curl -X POST "http://localhost:7860/reset?task=task1"
+## 📊 Evaluation API Layers
 
-# Take action
-curl -X POST http://localhost:7860/step \
-  -H "Content-Type: application/json" \
-  -d '{"action_type":"read_file","path":"src/auth.py"}'
-
-# Submit
-curl -X POST http://localhost:7860/step \
-  -d '{"action_type":"submit"}'
-
-# Get evaluation
-curl http://localhost:7860/evaluate
-```
-
-## API Endpoints
-
-### Core (OpenEnv-compliant)
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/reset?task=task1` | POST | Start new episode |
-| `/step` | POST | Take one action |
-| `/state` | GET | Get current state |
-| `/health` | GET | Health check |
+| `/step` | POST | Takes singular OpenEnv navigation action (`read_file`, `write_file`) |
+| `/evaluate` | GET | Baseline evaluation metrics |
+| `/causal-probe` | GET | Builds directed acyclic graphs resolving true root-cause logic mapping |
+| `/confidence` | GET | Returns behavior-time confidence estimation algorithms |
+| `/counterfactual` | POST | Subjects agent to 6 robustness ablation tests to detect hallucination |
 
-### Evaluation Layer
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/trajectory` | GET | Full action log with timing and diffs |
-| `/evaluate` | GET | Multi-dimensional scores (6 axes) |
-| `/metrics` | GET | Memory, security, timeline stats |
-| `/fault-config` | POST | Enable fault injection |
-
-## Evaluation Dimensions
-
-```
-efficiency   [████████████████░░░░] 0.800  — 5 steps vs 4 optimal
-navigation   [████████████████████] 1.000  — read relevant files first
-correctness  [██████████████░░░░░░] 0.714  — 71.4% tests passing
-reasoning    [████████████████████] 1.000  — correct read→write→test pattern
-robustness   [████████████████████] 1.000  — no errors encountered
-security     [████████████████████] 1.000  — no unsafe code detected
-```
-
-## Project Structure
-
-```
-codebase-nav-env/
-├── app.py                  # Gradio UI + FastAPI (HF Space entry point)
-├── run_agent.py            # Standalone HF agent (deterministic + LLM)
-├── inference.py            # OpenEnv inference script ([START]/[STEP]/[END])
-├── server/
-│   ├── app.py              # FastAPI endpoints
-│   ├── environment.py      # Core RL environment
-│   ├── models.py           # Pydantic models
-│   ├── grader.py           # pytest runner
-│   ├── repo_loader.py      # Template loader
-│   ├── sandbox.py          # Secure subprocess
-│   ├── trajectory.py       # Full trajectory recording
-│   ├── evaluator.py        # 6-dimension scoring engine
-│   ├── fault_injection.py  # Robustness testing
-│   ├── security.py         # Unsafe code detection
-│   └── memory.py           # Context efficiency tracking
-├── repo_templates/          # 15 task variants
-│   ├── task1/               # 5 single-file bug variants
-│   ├── task2/               # 5 cross-module bug variants
-│   └── task3/               # 5 feature implementation variants
-├── openenv.yaml            # Environment metadata
-├── Dockerfile              # Docker build
-├── requirements.txt        # Dependencies
-└── README.md               # This file
-```
-
-## Why This Is Real-World
-
-This isn't a toy benchmark. It tests the **exact capabilities** production coding agents need:
-
-- **Navigate unfamiliar code** — agent sees only file names, not contents
-- **Budget exploration** — finite steps mean strategic reading matters
-- **Verify fixes** — must run tests, not just hope the fix works
-- **Handle noise** — real repos have misleading comments and dead code
-- **Write safe code** — production agents can't `eval()` or `os.system()`
-
-## License
-
-MIT
+*Stop trusting the vibe. Force the cognition.*
