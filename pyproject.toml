@@ -20,8 +20,12 @@ dependencies = [
     "httpx",
     "pytest",
     "gradio>=4.0",
-    "huggingface_hub"
+    "huggingface_hub",
+    "openenv-core>=0.2.0"
 ]
+
+[project.scripts]
+server = "server.app:main"
 
 [project.urls]
 Homepage = "https://huggingface.co/spaces/Chirag0123/codebase-nav-env"
