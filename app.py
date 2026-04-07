@@ -20,32 +20,26 @@ app.py — Gradio UI v4.0 — Full Research Platform
 import os
 import json
 import gradio as gr
-from server.environment import CodebaseNavEnvironment
+from server.app import (
+    app as fastapi_app,
+    env,
+    failure_clf,
+    strategy_det,
+    adv_metrics as adv_metrics_engine,
+    improvement as improvement_engine,
+    multi_agent as multi_agent_engine,
+    _causal as causal_probe,
+    _counter as counterfactual_engine,
+    _calibrator as confidence_calibrator,
+    _benchmark as benchmark_runner,
+    _analytics as analytics_engine,
+)
 from server.models import RepoAction
-from server.failure_classifier import FailureClassifier
-from server.strategy_detector import StrategyDetector
-from server.advanced_metrics import AdvancedMetricsEngine
-from server.self_improvement import SelfImprovementEngine
-from server.multi_agent import MultiAgentComparison
-from server.causal_probe import CausalProbe
-from server.counterfactual_engine import CounterfactualEngine
-from server.confidence_calibrator import ConfidenceCalibrator
-from server.benchmark_runner import BenchmarkRunner
-from server.analytics_engine import AnalyticsEngine
 from server.memory_bank import get_global_memory
 
 # ── Global instances ──────────────────────────────────────────────────────────
-env = CodebaseNavEnvironment()
-failure_clf = FailureClassifier()
-strategy_det = StrategyDetector()
-adv_metrics_engine = AdvancedMetricsEngine()
-improvement_engine = SelfImprovementEngine()
-multi_agent_engine = MultiAgentComparison()
-causal_probe = CausalProbe()
-counterfactual_engine = CounterfactualEngine()
-confidence_calibrator = ConfidenceCalibrator()
-benchmark_runner = BenchmarkRunner()
-analytics_engine = AnalyticsEngine()
+# All engines and the environment are imported from server.app so that 
+# Gradio interactions and direct HTTP REST calls use the exact same state.
 memory_bank = get_global_memory()
 
 
