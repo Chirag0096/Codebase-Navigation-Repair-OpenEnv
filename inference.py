@@ -17,9 +17,11 @@ from openai import OpenAI
 import httpx
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-API_BASE_URL = os.getenv("API_BASE_URL", "<your-active-endpoint>")
-MODEL_NAME = os.getenv("MODEL_NAME", "<your-active-model>")
+API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
+MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4-turbo-preview")
 HF_TOKEN = os.getenv("HF_TOKEN")
+if not HF_TOKEN:
+    raise ValueError("HF_TOKEN environment variable is required but missing.")
 
 # Optional — if you use from_docker_image():
 LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")
