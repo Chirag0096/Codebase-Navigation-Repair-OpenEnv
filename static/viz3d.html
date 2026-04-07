@@ -83,12 +83,12 @@
   #tl-header h3 { font-size: 10px; color: #7dd3fc; letter-spacing: 0.1em; }
   #step-label { font-size: 11px; color: #f0abfc; font-weight: 700; }
   #slider {
-    width: 100%; -webkit-appearance: none; height: 4px;
+    width: 100%; -webkit-appearance: none; appearance: none; height: 4px;
     background: linear-gradient(to right, #7dd3fc 0%, #7dd3fc var(--pct,0%), #1e293b var(--pct,0%));
     border-radius: 4px; outline: none; cursor: pointer;
   }
   #slider::-webkit-slider-thumb {
-    -webkit-appearance: none; width: 15px; height: 15px;
+    -webkit-appearance: none; appearance: none; width: 15px; height: 15px;
     border-radius: 50%; background: #7dd3fc; cursor: pointer;
     box-shadow: 0 0 8px rgba(125,211,252,0.8);
   }
@@ -133,11 +133,24 @@
     text-align: center; color: #475569; font-size: 13px;
     display: none;
   }
+  /* Node Labels Overlay */
+  #labels-container { position: fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index: 15; }
+  .node-label {
+    position: absolute; color: rgba(224,230,240,0.9);
+    font-size: 10px; font-weight: 600; padding: 3px 7px;
+    background: rgba(10,14,26,0.7); border: 1px solid rgba(125,211,252,0.25);
+    border-radius: 4px; transform: translate(-50%, -200%);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    pointer-events: auto; white-space: nowrap;
+    opacity: 0; transition: opacity 0.2s, box-shadow 0.2s;
+  }
+  .node-label:hover { box-shadow: 0 0 10px rgba(125,211,252,0.6); z-index: 100; }
 </style>
 </head>
 <body>
 
 <canvas id="three-canvas"></canvas>
+<div id="labels-container"></div>
 
 <div id="loader"><div class="spin"></div><p>Loading 3D...</p></div>
 <div id="no-data">
@@ -284,9 +297,10 @@ function updateCamera() {
 // ── Scene state ───────────────────────────────────────────────────────────────
 const COLS = { src:0xf97316, test:0x3b82f6, spec:0xa855f7, visited:0x22c55e, bug:0xef4444, agent:0xfbbf24, path:0xfacc15, edge:0x334155 };
 
-let nodeMap = {};   // filename → { mesh, basePos }
+let nodeMap = {};   // filename → { mesh, basePos, labelEl }
 let pathLines = [], edgeLines = [];
 let agentMesh = null;
+let targetAgentPos = new THREE.Vector3(0, 3.5, 0); // For smooth lerp interpolation
 let vizData = null;
 let curStep = 0, maxStep = 0;
 let playing = false, playTimer = null;
@@ -294,7 +308,10 @@ let frame = 0;
 
 // ── Build scene ───────────────────────────────────────────────────────────────
 function clearScene() {
-  Object.values(nodeMap).forEach(o => scene.remove(o.mesh));
+  Object.values(nodeMap).forEach(o => {
+    scene.remove(o.mesh);
+    if (o.labelEl && o.labelEl.parentNode) o.labelEl.parentNode.removeChild(o.labelEl);
+  });
   pathLines.forEach(l => scene.remove(l));
   edgeLines.forEach(l => scene.remove(l));
   if (agentMesh) scene.remove(agentMesh);
@@ -339,7 +356,13 @@ function buildScene(data) {
     ring.rotation.x = Math.PI / 2;
     mesh.add(ring);
 
-    nodeMap[f.name] = { mesh, basePos: pos.clone() };
+    // HTML Label Overlay
+    const labelEl = document.createElement('div');
+    labelEl.className = 'node-label';
+    labelEl.textContent = f.name;
+    document.getElementById('labels-container').appendChild(labelEl);
+
+    nodeMap[f.name] = { mesh, basePos: pos.clone(), labelEl };
   });
 
   // Dependency edges
@@ -443,17 +466,17 @@ function applyStep(idx) {
     scene.add(line); pathLines.push(line);
   }
 
-  // Move agent
+  // Move agent target (actual animation uses lerp in animate loop)
   if (idx > 0 && idx <= steps.length) {
     const cur = steps[idx - 1];
     if (cur && cur.path && nodeMap[cur.path]) {
       const tp = nodeMap[cur.path].basePos;
-      agentMesh.position.set(tp.x, tp.y + 1.3, tp.z);
+      targetAgentPos.set(tp.x, tp.y + 1.6, tp.z);
     } else {
-      agentMesh.position.set(0, 2.5, 0);
+      targetAgentPos.set(0, 2.5, 0);
     }
   } else {
-    agentMesh.position.set(0, 3.5, 0);
+    targetAgentPos.set(0, 3.5, 0);
   }
 
   updateLog(steps, idx - 1);
@@ -554,15 +577,33 @@ function animate() {
   requestAnimationFrame(animate);
   frame++;
   updateCamera();
-  // Pulsing agent
+  // Pulsing & moving agent (seamless flow)
   if (agentMesh) {
+    agentMesh.position.lerp(targetAgentPos, 0.08); // Smooth transition
     const p = 1 + Math.sin(frame * 0.09) * 0.18;
     agentMesh.scale.setScalar(p);
     agentMesh.rotation.y += 0.04;
   }
-  // Subtle node float
-  Object.values(nodeMap).forEach(({ mesh, basePos }, i) => {
-    mesh.position.y = basePos.y + Math.sin(frame * 0.018 + i * 1.1) * 0.07;
+  // Subtle node float & Update HTML overaly positions
+  Object.values(nodeMap).forEach(({ mesh, basePos, labelEl }, i) => {
+    mesh.position.y = basePos.y + Math.sin(frame * 0.018 + i * 1.1) * 0.12;
+    
+    // Project 3D vector to 2D screen space
+    if (labelEl) {
+      const pos = mesh.position.clone();
+      pos.project(camera);
+      const x = (pos.x * 0.5 + 0.5) * window.innerWidth;
+      const y = (pos.y * -0.5 + 0.5) * window.innerHeight;
+      
+      // Hide if behind camera or very close to edges
+      if (pos.z > 0.99 || Math.abs(pos.x) > 1.2 || Math.abs(pos.y) > 1.2) {
+        labelEl.style.opacity = '0';
+      } else {
+        labelEl.style.left = `${x}px`;
+        labelEl.style.top = `${y}px`;
+        labelEl.style.opacity = '1';
+      }
+    }
   });
   renderer.render(scene, camera);
 }
